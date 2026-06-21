@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Chapter 2 Mastery Map</title>
+<style>
+body{font-family:Arial;background:#f4f4f4;margin:20px}
+h1{text-align:center}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:1200px;margin:auto}
+.node{
+background:#ffcccc;
+border:2px solid #444;
+border-radius:10px;
+padding:12px;
+cursor:pointer;
+}
+#panel{
+max-width:1000px;
+margin:20px auto;
+background:white;
+padding:20px;
+border-radius:10px;
+border:2px solid #444;
+}
+.question{
+border:1px solid #ccc;
+padding:10px;
+margin:12px 0;
+border-radius:8px;
+}
+.feedback{font-weight:bold;margin-top:5px}
+.score{font-size:20px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<h1>Chapter 2 Interactive Mastery Map</h1>
+
+<div class="grid" id="grid"></div>
+
+<div id="panel">
+<h2>Select a concept</h2>
+<p>All questions for that concept will appear.</p>
+</div>
+
+<script>
+
+const topics=[
+{
+title:"Wave Equation",
+questions:[
+["Which quantity represents spatial curvature?",["Amplitude","Laplacian","Frequency","Period"],1,
+["Amplitude is displacement.","Correct.","Frequency is temporal.","Period is time."]],
+["The wave equation links:",["Curvature and acceleration","Mass and energy","Charge and current","Velocity and force"],0,
+["Correct.","No.","No.","No."]],
+["Why does c appear squared?",["Units","Convention","Geometry","No reason"],0,
+["Correct.","No.","No.","No."]]
+]
+},
+{
+title:"Laplacian",
+questions:[
+["For u=3x²+2x−5, Laplacian?",["6","3","2","0"],0,["Correct.","No.","No.","No."]],
+["Laplacian measures:",["Curvature","Slope","Amplitude","Frequency"],0,["Correct.","No.","No.","No."]],
+["2D Laplacian equals:",["∂²x+∂²y","∂x","∂t","none"],0,["Correct.","No.","No.","No."]]
+]
+},
+{
+title:"Phase Speed",
+questions:[
+["Phase speed equals:",["ω/k","k/ω","ωk","1/ω"],0,["Correct.","No.","No.","No."]],
+["Units of phase speed:",["m/s","Hz","m","rad/s"],0,["Correct.","No.","No.","No."]],
+["If ω doubles and k fixed:",["v doubles","v halves","same","zero"],0,["Correct.","No.","No.","No."]]
+]
+},
+{
+title:"Doppler Effect",
+questions:[
+["Approaching source causes:",["Higher frequency","Lower frequency","No change","Zero"],0,["Correct.","No.","No.","No."]],
+["Receding source causes:",["Lower frequency","Higher frequency","Infinite","No change"],0,["Correct.","No.","No.","No."]],
+["Doppler changes:",["Observed frequency","Wave speed","Charge","Amplitude only"],0,["Correct.","No.","No.","No."]]
+]
+},
+{
+title:"Sonic Boom",
+questions:[
+["Occurs when:",["vs=v","vs=0","f=0","v=0"],0,["Correct.","No.","No.","No."]],
+["Mach cone forms when:",["Source outruns wavefronts","Observer moves","Amplitude grows","Frequency zero"],0,["Correct.","No.","No.","No."]],
+["Mach 1 angle:",["90°","0°","45°","none"],0,["Correct.","No.","No.","No."]]
+]
+},
+{
+title:"Wave Energy",
+questions:[
+["Wave energy proportional to:",["A²f²","A+f","A/f","f"],0,["Correct.","No.","No.","No."]],
+["Double amplitude:",["Energy ×4","×2","×8","same"],0,["Correct.","No.","No.","No."]],
+["Double frequency:",["Energy ×4","×2","×8","same"],0,["Correct.","No.","No.","No."]]
+]
+},
+{
+title:"Mechanical Waves",
+questions:[
+["String wave speed:",["√(T/μ)","Tμ","μ/T","T²"],0,["Correct.","No.","No.","No."]],
+["μ means:",["Mass per length","Force","Amplitude","Energy"],0,["Correct.","No.","No.","No."]],
+["Increase tension:",["Increase speed","Decrease speed","No change","Stop wave"],0,["Correct.","No.","No.","No."]]
+]
+},
+{
+title:"EM Waves",
+questions:[
+["Produced by:",["Accelerating charges","Static charges","Masses","Neutrons"],0,["Correct.","No.","No.","No."]],
+["E and B are:",["Perpendicular","Parallel","Random","Opposite"],0,["Correct.","No.","No.","No."]],
+["Can travel in vacuum because:",["Changing E creates B","Need electrons","Need air","Need atoms"],0,["Correct.","No.","No.","No."]]
+]
+}
+];
+
+const grid=document.getElementById("grid");
+const panel=document.getElementById("panel");
+
+topics.forEach((t,i)=>{
+ const d=document.createElement("div");
+ d.className="node";
+ d.id="node"+i;
+ d.innerHTML="<h3>"+t.title+"</h3><p>"+t.questions.length+" questions</p>";
+ d.onclick=()=>openTopic(i);
+ grid.appendChild(d);
+});
+
+function openTopic(i){
+
+ let correct=0;
+ let answered=0;
+
+ panel.innerHTML="<h2>"+topics[i].title+"</h2><div class='score' id='score'>0/"+topics[i].questions.length+"</div>";
+
+ topics[i].questions.forEach((q,qi)=>{
+
+   const box=document.createElement("div");
+   box.className="question";
+
+   box.innerHTML="<b>Q"+(qi+1)+": "+q[0]+"</b><br>";
+
+   const fb=document.createElement("div");
+   fb.className="feedback";
+
+   q[1].forEach((choice,ci)=>{
+      const b=document.createElement("button");
+      b.textContent=choice;
+      b.onclick=()=>{
+
+        if(b.disabled)return;
+
+        answered++;
+
+        if(ci===q[2]){
+          correct++;
+          fb.innerHTML="✅ "+q[3][ci];
+          fb.style.color="green";
+        }else{
+          fb.innerHTML="❌ "+q[3][ci];
+          fb.style.color="red";
+        }
+
+        box.querySelectorAll("button").forEach(x=>x.disabled=true);
+
+        document.getElementById("score").innerHTML=correct+"/"+topics[i].questions.length;
+
+        if(answered===topics[i].questions.length){
+
+            const node=document.getElementById("node"+i);
+
+            if(correct===topics[i].questions.length){
+                node.style.background="#b6f5b6";
+            }
+            else if(correct>=topics[i].questions.length/2){
+                node.style.background="#fff4a3";
+            }
+            else{
+                node.style.background="#ffb3b3";
+            }
+        }
+      };
+      box.appendChild(b);
+   });
+
+   box.appendChild(fb);
+   panel.appendChild(box);
+ });
+
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">Real-time Doppler shift visualization with live FFT showing how the observed frequency spectrum shifts blue when the source approaches and red when it recedes.</h2>
+
+<div style="background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 1rem;">
+  <canvas id="scene" width="680" height="220" style="display:block;width:100%;height:auto;background:#0a0a0f;border-radius:var(--border-radius-md);"></canvas>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 14px;">
+    <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px;">Time-domain signal at observer</div>
+    <canvas id="wave" width="320" height="120" style="display:block;width:100%;height:120px;background:#0a0a0f;border-radius:var(--border-radius-md);"></canvas>
+  </div>
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 14px;">
+    <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px;">FFT spectrum</div>
+    <canvas id="fft" width="320" height="120" style="display:block;width:100%;height:120px;background:#0a0a0f;border-radius:var(--border-radius-md);"></canvas>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px;">
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px 12px;">
+    <div style="font-size: 11px; color: var(--color-text-secondary);">Emitted f₀</div>
+    <div style="font-size: 16px; font-weight: 500;" id="r-f0">— Hz</div>
+  </div>
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px 12px;">
+    <div style="font-size: 11px; color: var(--color-text-secondary);">Observed f'</div>
+    <div style="font-size: 16px; font-weight: 500;" id="r-f">— Hz</div>
+  </div>
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 8px 12px;">
+    <div style="font-size: 11px; color: var(--color-text-secondary);">Shift Δf/f₀</div>
+    <div style="font-size: 16px; font-weight: 500;" id="r-shift">—</div>
+  </div>
+</div>
+
+<div style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <label for="vel" style="min-width: 80px; color: var(--color-text-secondary);">v / c_w</label>
+    <input type="range" id="vel" min="-0.85" max="0.85" step="0.01" value="0" style="flex: 1;">
+    <span id="vel-val" style="min-width: 60px; text-align: right;">0.00</span>
+  </div>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <label for="f0" style="min-width: 80px; color: var(--color-text-secondary);">Source f₀</label>
+    <input type="range" id="f0" min="3" max="20" step="0.5" value="8" style="flex: 1;">
+    <span id="f0-val" style="min-width: 60px; text-align: right;">8.0 Hz</span>
+  </div>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <label for="mode" style="min-width: 80px; color: var(--color-text-secondary);">Mode</label>
+    <select id="mode" style="flex: 1; height: 32px;">
+      <option value="classical">Classical (sound)</option>
+      <option value="relativistic">Relativistic (light)</option>
+    </select>
+  </div>
+</div>
+
+<div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+  <button onclick="setVel(-0.5)" style="color:#3B8BD4">← Approach (blueshift)</button>
+  <button onclick="setVel(0)">Rest</button>
+  <button onclick="setVel(0.5)" style="color:#E24B4A">Recede (redshift) →</button>
+  <button onclick="sendPrompt('Show me the cosmological redshift and how it differs from the kinematic Doppler effect')">Cosmological z ↗</button>
+</div>
+
+<div style="margin-top: 12px; font-size: 12px; color: var(--color-text-secondary); line-height: 1.6;">
+  The top panel shows wavefronts emitted by the moving source. The observer (the colored dot on the right) samples the waveform, and the FFT updates live. Approaching → spectrum peak migrates left to <span style="color:#3B8BD4">blue (higher f)</span>; receding → peak migrates right to <span style="color:#E24B4A">red (lower f)</span>. (Frequency axis convention is physics: low on left, high on right; the color names refer to the visible spectrum.)
+</div>
+</div>
+
+<script>
+(function() {
+  const scene = document.getElementById('scene');
+  const sctx = scene.getContext('2d');
+  const wave = document.getElementById('wave');
+  const wctx = wave.getContext('2d');
+  const fft = document.getElementById('fft');
+  const fctx = fft.getContext('2d');
+
+  const SW = 680, SH = 220;
+  const WW = 320, WH = 120;
+  const FW = 320, FH = 120;
+
+  let t = 0;
+  let lastFrame = performance.now();
+  let pulses = [];
+  let sourceX = SW / 2;
+  let lastEmit = -Infinity;
+  let observerX = SW - 50;
+  let observerY = SH / 2;
+
+  // Sample buffer for FFT
+  const SAMPLE_RATE = 240; // Hz (samples per simulated second)
+  const N = 256;           // FFT size — power of 2
+  const samples = new Float32Array(N);
+  let sampleIdx = 0;
+  let sampleClock = 0;
+
+  const c_w = 80; // wave speed in px/s
+
+  function $(id) { return document.getElementById(id); }
+
+  function getParams() {
+    return {
+      v_ratio: parseFloat($('vel').value),
+      f0: parseFloat($('f0').value),
+      mode: $('mode').value
+    };
+  }
+
+  function setVel(v) {
+    $('vel').value = v;
+    $('vel-val').textContent = v.toFixed(2);
+  }
+
+  // Iterative radix-2 FFT (Cooley–Tukey)
+  function fft_inplace(re, im) {
+    const n = re.length;
+    // bit reversal
+    let j = 0;
+    for (let i = 1; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) {
+        let tr = re[i]; re[i] = re[j]; re[j] = tr;
+        let ti = im[i]; im[i] = im[j]; im[j] = ti;
+      }
+    }
+    // butterflies
+    for (let len = 2; len <= n; len <<= 1) {
+      const half = len >> 1;
+      const ang = -2 * Math.PI / len;
+      const wRe = Math.cos(ang), wIm = Math.sin(ang);
+      for (let i = 0; i < n; i += len) {
+        let curRe = 1, curIm = 0;
+        for (let k = 0; k < half; k++) {
+          const uRe = re[i + k], uIm = im[i + k];
+          const vRe = re[i + k + half] * curRe - im[i + k + half] * curIm;
+          const vIm = re[i + k + half] * curIm + im[i + k + half] * curRe;
+          re[i + k] = uRe + vRe;
+          im[i + k] = uIm + vIm;
+          re[i + k + half] = uRe - vRe;
+          im[i + k + half] = uIm - vIm;
+          const ncRe = curRe * wRe - curIm * wIm;
+          curIm = curRe * wIm + curIm * wRe;
+          curRe = ncRe;
+        }
+      }
+    }
+  }
+
+  function dopplerFactor(v_ratio, mode) {
+    // Positive v_ratio = source receding from observer → redshift → f' < f0
+    // Negative v_ratio = source approaching → blueshift → f' > f0
+    if (mode === 'classical') {
+      // observer stationary, source moves: f' = f0 / (1 + v/c) where v>0 means recession
+      return 1 / (1 + v_ratio);
+    } else {
+      // relativistic radial: f' = f0 * sqrt((1-β)/(1+β)) with β>0 = recession
+      const beta = v_ratio;
+      if (Math.abs(beta) >= 1) return 1;
+      return Math.sqrt((1 - beta) / (1 + beta));
+    }
+  }
+
+  function step(dt) {
+    const { v_ratio, f0 } = getParams();
+    // Source moves along x. Sign convention: v_ratio > 0 = source moving away from observer (to the left).
+    // To make this visually intuitive: positive v_ratio → source moves LEFT (away from observer on right).
+    const vs = -v_ratio * c_w; // px/s in scene
+    sourceX += vs * dt;
+    if (sourceX < 60) sourceX = 60;
+    if (sourceX > SW - 90) sourceX = SW - 90;
+
+    // emit wavefronts at f0 rate
+    const period = 1 / f0;
+    if (t - lastEmit >= period || lastEmit === -Infinity) {
+      pulses.push({ x: sourceX, y: SH / 2, t_emit: t });
+      lastEmit = t;
+    }
+    pulses = pulses.filter(p => (t - p.t_emit) * c_w < 2 * SW);
+
+    // Sample the signal at the observer
+    sampleClock += dt;
+    const sampleStep = 1 / SAMPLE_RATE;
+    while (sampleClock >= sampleStep) {
+      sampleClock -= sampleStep;
+      // Observed waveform: superpose contribution from each wavefront,
+      // but it's simpler and equivalent to compute the Doppler-shifted sine directly.
+      const { v_ratio, f0, mode } = getParams();
+      const factor = dopplerFactor(v_ratio, mode);
+      const f_obs = f0 * factor;
+      // simulated time at observer
+      const sample = Math.sin(2 * Math.PI * f_obs * t);
+      samples[sampleIdx] = sample;
+      sampleIdx = (sampleIdx + 1) % N;
+    }
+    t += dt;
+  }
+
+  function drawScene() {
+    const { v_ratio, f0, mode } = getParams();
+    sctx.fillStyle = '#0a0a0f';
+    sctx.fillRect(0, 0, SW, SH);
+    sctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    sctx.lineWidth = 1;
+    for (let x = 0; x < SW; x += 40) {
+      sctx.beginPath(); sctx.moveTo(x, 0); sctx.lineTo(x, SH); sctx.stroke();
+    }
+
+    // wavefronts
+    for (const p of pulses) {
+      const age = t - p.t_emit;
+      const r = age * c_w;
+      if (r < 1) continue;
+      const alpha = Math.max(0.1, 1 - r / (1.4 * SW));
+      // tint front (toward observer) blue, back red — based on emission position vs current source
+      sctx.strokeStyle = `rgba(180, 200, 230, ${alpha * 0.8})`;
+      sctx.lineWidth = 1.1;
+      sctx.beginPath();
+      sctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      sctx.stroke();
+    }
+
+    // source
+    sctx.fillStyle = '#F2A623';
+    sctx.beginPath();
+    sctx.arc(sourceX, SH / 2, 7, 0, Math.PI * 2);
+    sctx.fill();
+    sctx.fillStyle = '#F2A623';
+    sctx.font = '500 12px sans-serif';
+    sctx.fillText('source', sourceX - 18, SH / 2 - 14);
+
+    // velocity arrow (visual direction)
+    if (Math.abs(v_ratio) > 0.01) {
+      const dir = v_ratio > 0 ? -1 : 1; // recession = leftward
+      const len = Math.min(50, Math.abs(v_ratio) * 70);
+      sctx.strokeStyle = '#F2A623';
+      sctx.lineWidth = 2;
+      sctx.beginPath();
+      sctx.moveTo(sourceX + dir * 10, SH / 2);
+      sctx.lineTo(sourceX + dir * (10 + len), SH / 2);
+      sctx.stroke();
+      const ax = sourceX + dir * (10 + len);
+      sctx.beginPath();
+      sctx.moveTo(ax, SH / 2);
+      sctx.lineTo(ax - dir * 5, SH / 2 - 4);
+      sctx.lineTo(ax - dir * 5, SH / 2 + 4);
+      sctx.closePath();
+      sctx.fillStyle = '#F2A623';
+      sctx.fill();
+    }
+
+    // observer — color codes the shift
+    const factor = dopplerFactor(v_ratio, mode);
+    const obsColor = factor > 1.02 ? '#3B8BD4' : factor < 0.98 ? '#E24B4A' : '#B4B2A9';
+    sctx.fillStyle = obsColor;
+    sctx.beginPath();
+    sctx.arc(observerX, observerY, 8, 0, Math.PI * 2);
+    sctx.fill();
+    sctx.fillStyle = obsColor;
+    sctx.font = '500 12px sans-serif';
+    sctx.fillText('observer', observerX - 32, observerY - 14);
+  }
+
+  function drawWave() {
+    wctx.fillStyle = '#0a0a0f';
+    wctx.fillRect(0, 0, WW, WH);
+    // zero line
+    wctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    wctx.lineWidth = 1;
+    wctx.beginPath(); wctx.moveTo(0, WH / 2); wctx.lineTo(WW, WH / 2); wctx.stroke();
+
+    const { v_ratio, mode } = getParams();
+    const factor = dopplerFactor(v_ratio, mode);
+    const color = factor > 1.02 ? '#3B8BD4' : factor < 0.98 ? '#E24B4A' : '#9FE1CB';
+    wctx.strokeStyle = color;
+    wctx.lineWidth = 1.5;
+    wctx.beginPath();
+    // read samples in time order starting from sampleIdx (oldest)
+    for (let i = 0; i < N; i++) {
+      const s = samples[(sampleIdx + i) % N];
+      const x = (i / (N - 1)) * WW;
+      const y = WH / 2 - s * (WH / 2 - 6);
+      if (i === 0) wctx.moveTo(x, y); else wctx.lineTo(x, y);
+    }
+    wctx.stroke();
+  }
+
+  function drawFFT() {
+    fctx.fillStyle = '#0a0a0f';
+    fctx.fillRect(0, 0, FW, FH);
+
+    // Apply Hann window then FFT
+    const re = new Float32Array(N);
+    const im = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const wnd = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1));
+      re[i] = samples[(sampleIdx + i) % N] * wnd;
+      im[i] = 0;
+    }
+    fft_inplace(re, im);
+    // magnitude (only first N/2 = positive freqs)
+    const mags = new Float32Array(N / 2);
+    let maxMag = 1e-6;
+    let peakBin = 0;
+    for (let i = 0; i < N / 2; i++) {
+      const m = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+      mags[i] = m;
+      if (m > maxMag) { maxMag = m; peakBin = i; }
+    }
+
+    // Display range: 0 to fmax Hz
+    const fmax = SAMPLE_RATE / 2; // Nyquist
+    const displayMaxBin = N / 2;
+
+    // axis ticks at f0
+    const { f0, v_ratio, mode } = getParams();
+    const factor = dopplerFactor(v_ratio, mode);
+    const f_obs = f0 * factor;
+    const xOfFreq = (f) => (f / fmax) * FW;
+
+    // f0 reference (dashed)
+    fctx.strokeStyle = 'rgba(180,180,180,0.45)';
+    fctx.setLineDash([3, 3]);
+    fctx.lineWidth = 1;
+    const x0 = xOfFreq(f0);
+    fctx.beginPath(); fctx.moveTo(x0, 8); fctx.lineTo(x0, FH); fctx.stroke();
+    fctx.setLineDash([]);
+    fctx.fillStyle = 'rgba(200,200,200,0.7)';
+    fctx.font = '500 10px sans-serif';
+    fctx.fillText('f₀', x0 + 3, 16);
+
+    // observed peak marker
+    const peakColor = factor > 1.02 ? '#3B8BD4' : factor < 0.98 ? '#E24B4A' : '#9FE1CB';
+    const xp = xOfFreq(f_obs);
+    fctx.strokeStyle = peakColor;
+    fctx.lineWidth = 1;
+    fctx.setLineDash([2, 3]);
+    fctx.beginPath(); fctx.moveTo(xp, 8); fctx.lineTo(xp, FH); fctx.stroke();
+    fctx.setLineDash([]);
+    fctx.fillStyle = peakColor;
+    fctx.fillText("f'", xp + 3, 16);
+
+    // spectrum bars
+    fctx.fillStyle = peakColor;
+    const visBins = Math.min(N / 2, Math.floor((fmax / fmax) * (N / 2)));
+    const barW = FW / visBins;
+    for (let i = 0; i < visBins; i++) {
+      const h = (mags[i] / maxMag) * (FH - 16);
+      fctx.fillRect(i * barW, FH - h, Math.max(1, barW - 0.5), h);
+    }
+
+    // x-axis label
+    fctx.fillStyle = 'rgba(160,160,160,0.7)';
+    fctx.font = '10px sans-serif';
+    fctx.fillText('0', 2, FH - 2);
+    fctx.fillText(fmax.toFixed(0) + ' Hz', FW - 44, FH - 2);
+  }
+
+  function updateReadouts() {
+    const { v_ratio, f0, mode } = getParams();
+    const factor = dopplerFactor(v_ratio, mode);
+    const f_obs = f0 * factor;
+    $('r-f0').textContent = f0.toFixed(1) + ' Hz';
+    $('r-f').textContent = f_obs.toFixed(2) + ' Hz';
+    const shift = (f_obs - f0) / f0;
+    const sign = shift >= 0 ? '+' : '';
+    const color = factor > 1.02 ? '#3B8BD4' : factor < 0.98 ? '#E24B4A' : 'var(--color-text-primary)';
+    $('r-shift').textContent = sign + (shift * 100).toFixed(1) + '%';
+    $('r-shift').style.color = color;
+  }
+
+  function loop(now) {
+    const dt = Math.min(0.05, (now - lastFrame) / 1000);
+    lastFrame = now;
+    step(dt);
+    drawScene();
+    drawWave();
+    drawFFT();
+    updateReadouts();
+    requestAnimationFrame(loop);
+  }
+
+  // wire controls
+  $('vel').addEventListener('input', (e) => {
+    $('vel-val').textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  $('f0').addEventListener('input', (e) => {
+    $('f0-val').textContent = parseFloat(e.target.value).toFixed(1) + ' Hz';
+  });
+  $('mode').addEventListener('change', () => { /* recompute on next frame */ });
+
+  // expose setVel globally
+  window.setVel = setVel;
+
+  requestAnimationFrame((tt) => { lastFrame = tt; loop(tt); });
+})();
+</script>

@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 2-1 — The Wave Equation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;1,300&family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap');
+
+  :root {
+    --purple-50:#EEEDFE;--purple-100:#CECBF6;--purple-200:#AFA9EC;
+    --purple-400:#7F77DD;--purple-600:#534AB7;--purple-800:#3C3489;
+    --teal-50:#E1F5EE;--teal-100:#9FE1CB;--teal-600:#0F6E56;--teal-800:#085041;
+    --coral-50:#FAECE7;--coral-100:#F5C4B3;--coral-600:#993C1D;--coral-800:#712B13;
+    --gray-50:#F1EFE8;--gray-100:#D3D1C7;--gray-400:#888780;--gray-600:#5F5E5A;
+    --bg:#FAFAF8;--surface:#FFFFFF;
+    --border:rgba(0,0,0,0.10);--border-strong:rgba(0,0,0,0.18);
+    --text:#1a1a18;--text-2:#5F5E5A;--text-3:#888780;
+    --radius:10px;--radius-lg:16px;
+    --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;--serif:'Source Serif 4',serif;
+  }
+  @media(prefers-color-scheme:dark){:root{
+    --purple-50:#26215C;--purple-100:#3C3489;--purple-200:#534AB7;
+    --purple-400:#7F77DD;--purple-600:#AFA9EC;--purple-800:#CECBF6;
+    --teal-50:#04342C;--teal-100:#085041;--teal-600:#5DCAA5;--teal-800:#9FE1CB;
+    --coral-50:#4A1B0C;--coral-100:#712B13;--coral-600:#F0997B;--coral-800:#F5C4B3;
+    --gray-50:#2C2C2A;--gray-100:#444441;--gray-400:#888780;--gray-600:#B4B2A9;
+    --bg:#141412;--surface:#1e1e1b;
+    --border:rgba(255,255,255,0.09);--border-strong:rgba(255,255,255,0.16);
+    --text:#EEECEA;--text-2:#B4B2A9;--text-3:#888780;
+  }}
+
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+
+  .page-header{padding:3rem 2rem 2rem;border-bottom:0.5px solid var(--border);max-width:900px;margin:0 auto}
+  .chapter-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--purple-400);margin-bottom:.5rem;text-transform:uppercase}
+  h1{font-family:var(--serif);font-weight:300;font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.2;margin-bottom:.75rem}
+  .subtitle{font-size:15px;color:var(--text-2);line-height:1.6;max-width:560px}
+
+  .main{max-width:900px;margin:0 auto;padding:2rem}
+  .section-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:1.25rem;display:flex;align-items:center;gap:10px}
+  .section-label::after{content:'';flex:1;height:0.5px;background:var(--border)}
+
+  svg.concept-map{width:100%;height:auto;display:block;margin-bottom:1rem}
+  .ng rect{transition:opacity .15s,stroke-width .15s;cursor:pointer}
+  .ng:hover rect{opacity:.82}
+  .ng.sel rect{stroke-width:2.5px !important}
+
+  /* ── Detail panel ── */
+  #detailPanel{margin-bottom:2rem;display:none}
+  #detailPanel.open{display:block;animation:slideIn .2s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+  .dp-wrap{border-radius:var(--radius-lg);overflow:hidden;border:0.5px solid var(--border-strong)}
+  .dp-head{padding:12px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid var(--border)}
+  .dp-title{font-size:15px;font-weight:500;color:var(--text)}
+  .dp-close{background:none;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:4px 12px;cursor:pointer;font-size:12px;color:var(--text-2);font-family:var(--mono)}
+  .dp-close:hover{background:var(--gray-50)}
+
+  .dp-body{padding:18px;background:var(--surface);display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:600px){.dp-body{grid-template-columns:1fr}}
+
+  .dp-explain{font-size:14px;color:var(--text-2);line-height:1.75}
+  .dp-explain strong{color:var(--text);font-weight:500}
+  .dp-right{display:flex;flex-direction:column;gap:10px}
+  .dp-formula{font-family:var(--mono);font-size:13px;padding:14px 16px;border-radius:var(--radius);white-space:pre-line;line-height:1.7;border-width:0.5px;border-style:solid}
+  .dp-why{font-size:13px;color:var(--text-2);line-height:1.6;padding:10px 14px;background:var(--gray-50);border-left-width:2px;border-left-style:solid}
+
+  /* ── Quiz inside panel ── */
+  .dp-quiz{border-top:0.5px solid var(--border);padding:16px 18px;background:var(--surface)}
+  .dq-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+  .dq-type{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--teal-50);color:var(--teal-600);font-family:var(--mono);text-transform:none;letter-spacing:0}
+  .dq-q{font-family:var(--serif);font-size:15px;line-height:1.55;color:var(--text);margin-bottom:12px}
+  .dq-opts{display:flex;flex-direction:column;gap:7px}
+  .dq-opt{border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:9px 13px;cursor:pointer;font-size:13px;font-family:var(--mono);color:var(--text-2);background:transparent;text-align:left;transition:all .12s;line-height:1.4}
+  .dq-opt:hover:not(:disabled){background:var(--gray-50);color:var(--text)}
+  .dq-opt:disabled{cursor:default}
+  .dq-opt.correct{border-color:var(--teal-600);background:var(--teal-50);color:var(--teal-800)}
+  .dq-opt.wrong{border-color:var(--coral-600);background:var(--coral-50);color:var(--coral-800)}
+  .dq-fill{width:100%;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:9px 13px;font-size:13px;font-family:var(--mono);color:var(--text);background:var(--bg);margin-bottom:8px}
+  .dq-fill:focus{outline:none;box-shadow:0 0 0 2px var(--purple-200)}
+  .dq-submit{border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:8px 16px;cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text-2);background:transparent}
+  .dq-submit:hover{background:var(--gray-50)}
+  .dq-tf{display:flex;gap:8px}
+  .dq-tf-btn{flex:1;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:9px;cursor:pointer;font-size:13px;font-family:var(--mono);color:var(--text-2);background:transparent;transition:all .12s}
+  .dq-tf-btn:hover:not(:disabled){background:var(--gray-50)}
+  .dq-tf-btn:disabled{cursor:default}
+  .dq-tf-btn.correct{border-color:var(--teal-600);background:var(--teal-50);color:var(--teal-800)}
+  .dq-tf-btn.wrong{border-color:var(--coral-600);background:var(--coral-50);color:var(--coral-800)}
+  .dq-feedback{margin-top:10px;padding:10px 13px;font-size:13px;line-height:1.6;color:var(--text-2);background:var(--gray-50);border-left:2px solid var(--purple-400);display:none}
+  .dq-feedback.show{display:block}
+  .dq-feedback strong{color:var(--text);font-weight:500}
+  .dq-retry{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--purple-400);cursor:pointer;background:none;border:none;padding:0}
+  .dq-retry:hover{text-decoration:underline}
+
+  /* ── Wave explorer ── */
+  .explorer-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .explorer-header{padding:1rem 1.25rem;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .explorer-title{font-size:14px;font-weight:500}
+  .formula-pill{font-family:var(--mono);font-size:12px;background:var(--purple-50);color:var(--purple-800);padding:3px 10px;border-radius:20px}
+  canvas#wc{display:block;width:100%;height:200px;background:var(--bg)}
+  .explorer-controls{padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;border-top:0.5px solid var(--border)}
+  .ctrl-row{display:flex;flex-direction:column;gap:6px}
+  .ctrl-label{display:flex;justify-content:space-between;align-items:baseline}
+  .ctrl-name{font-size:12px;color:var(--text-2)}
+  .ctrl-name em{font-style:italic;font-family:var(--serif);font-size:13px}
+  .ctrl-val{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--purple-400)}
+  input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:var(--border-strong);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--purple-600);cursor:pointer;transition:transform .1s}
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+  .dir-toggle{display:flex;gap:6px;grid-column:span 2}
+  .dir-btn{flex:1;border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:8px 10px;cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text-2);background:transparent;transition:all .12s;text-align:center}
+  .dir-btn:hover{background:var(--gray-50)}
+  .dir-btn.active{border-color:var(--purple-400);background:var(--purple-50);color:var(--purple-800)}
+  .readouts{display:grid;grid-template-columns:repeat(3,1fr);border-top:0.5px solid var(--border)}
+  .readout{padding:1rem 1.25rem;border-right:0.5px solid var(--border)}
+  .readout:last-child{border-right:none}
+  .readout-label{font-size:11px;color:var(--text-3);font-family:var(--mono);margin-bottom:4px}
+  .readout-val{font-family:var(--mono);font-size:18px;font-weight:500;color:var(--text)}
+
+  /* ── Chapter quiz ── */
+  .quiz-card{margin-top:2rem;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .quiz-header{padding:.75rem 1.25rem;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .quiz-tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+  .quiz-type-tag{font-size:11px;background:var(--teal-50);color:var(--teal-600);padding:2px 8px;border-radius:20px;font-family:var(--mono)}
+  .quiz-body{padding:1.25rem}
+  .quiz-q{font-family:var(--serif);font-size:16px;line-height:1.55;color:var(--text);margin-bottom:1rem}
+  .quiz-opts{display:flex;flex-direction:column;gap:8px}
+  .quiz-opt{border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:10px 14px;cursor:pointer;font-size:13px;font-family:var(--mono);color:var(--text-2);background:transparent;text-align:left;transition:all .12s}
+  .quiz-opt:hover:not(:disabled){background:var(--gray-50);color:var(--text)}
+  .quiz-opt:disabled{cursor:default}
+  .quiz-opt.correct{border-color:var(--teal-600);background:var(--teal-50);color:var(--teal-800)}
+  .quiz-opt.wrong{border-color:var(--coral-600);background:var(--coral-50);color:var(--coral-800)}
+  .quiz-feedback{margin-top:1rem;padding:12px 14px;font-size:13px;line-height:1.6;color:var(--text-2);background:var(--gray-50);border-left:2px solid var(--purple-400);display:none}
+  .quiz-feedback strong{color:var(--text);font-weight:500}
+
+  footer{max-width:900px;margin:3rem auto 0;padding:1.5rem 2rem;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-3);font-family:var(--mono)}
+  .next-link{color:var(--purple-400);text-decoration:none}
+  .next-link:hover{color:var(--purple-600)}
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <div class="chapter-label">Chapter 2-1</div>
+  <h1>The wave equation</h1>
+  <p class="subtitle">From a rock in a pond to ∂²y/∂t² = c²∂²y/∂x² — how physical intuition becomes mathematical structure.</p>
+</header>
+
+<main class="main">
+  <div class="section-label">Concept map — click any node</div>
+
+  <svg class="concept-map" viewBox="0 0 820 760" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <style>
+      .ng rect{transition:opacity .15s,stroke-width .15s;cursor:pointer}
+      .ng:hover rect{opacity:.82}
+      .ng.sel rect{stroke-width:2.5px !important}
+      .n-gray  {fill:var(--gray-50);  stroke:var(--gray-400)}
+      .n-purple{fill:var(--purple-50);stroke:var(--purple-400)}
+      .n-teal  {fill:var(--teal-50);  stroke:var(--teal-600)}
+      .n-coral {fill:var(--coral-50); stroke:var(--coral-600)}
+      .tb{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;fill:var(--text)}
+      .ts{font-family:'DM Sans',sans-serif;font-size:11px;fill:var(--text-2)}
+      .tm{font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--purple-400)}
+      .ag{stroke:var(--gray-400);  fill:none;stroke-width:1;marker-end:url(#arr)}
+      .ap{stroke:var(--purple-400);fill:none;stroke-width:1;marker-end:url(#arr)}
+      .at{stroke:var(--teal-600);  fill:none;stroke-width:1;marker-end:url(#arr)}
+    </style>
+
+    <g class="ng" id="n-rock"  onclick="showNode('rock')">
+      <rect x="260" y="20"  width="300" height="54" rx="8" stroke-width="0.5" class="n-gray"/>
+      <text class="tb" x="410" y="43" text-anchor="middle" dominant-baseline="central">Rock in a pond</text>
+      <text class="ts" x="410" y="61" text-anchor="middle" dominant-baseline="central">A disturbance propagates outward</text>
+    </g>
+    <line x1="410" y1="74" x2="410" y2="106" class="ag"/>
+
+    <g class="ng" id="n-ingr" onclick="showNode('ingr')">
+      <rect x="260" y="106" width="300" height="54" rx="8" stroke-width="0.5" class="n-gray"/>
+      <text class="tb" x="410" y="129" text-anchor="middle" dominant-baseline="central">Two key ingredients</text>
+      <text class="ts" x="410" y="147" text-anchor="middle" dominant-baseline="central">Curvature in space + acceleration in time</text>
+    </g>
+    <line x1="260" y1="133" x2="196" y2="133" class="at"/>
+    <line x1="560" y1="133" x2="624" y2="133" class="at"/>
+
+    <g class="ng" id="n-lapl" onclick="showNode('lapl')">
+      <rect x="60"  y="106" width="136" height="54" rx="8" stroke-width="0.5" class="n-teal"/>
+      <text class="tb" x="128" y="127" text-anchor="middle" dominant-baseline="central">Laplacian ∇²</text>
+      <text class="ts" x="128" y="147" text-anchor="middle" dominant-baseline="central">Curvature of space</text>
+    </g>
+
+    <g class="ng" id="n-accel" onclick="showNode('accel')">
+      <rect x="624" y="106" width="136" height="54" rx="8" stroke-width="0.5" class="n-teal"/>
+      <text class="tb" x="692" y="127" text-anchor="middle" dominant-baseline="central">∂²y / ∂t²</text>
+      <text class="ts" x="692" y="147" text-anchor="middle" dominant-baseline="central">Acceleration in time</text>
+    </g>
+    <path d="M128 160 L128 196 L408 196" class="ag"/>
+    <path d="M692 160 L692 196 L412 196" class="ag"/>
+
+    <g class="ng" id="n-weq" onclick="showNode('weq')">
+      <rect x="230" y="196" width="360" height="58" rx="8" stroke-width="0.5" class="n-purple"/>
+      <text class="tb" x="410" y="218" text-anchor="middle" dominant-baseline="central">The wave equation</text>
+      <text class="tm" x="410" y="240" text-anchor="middle" dominant-baseline="central">∂²y/∂t² = c² ∂²y/∂x²</text>
+    </g>
+    <line x1="410" y1="254" x2="410" y2="286" class="ap"/>
+
+    <g class="ng" id="n-sol" onclick="showNode('sol')">
+      <rect x="210" y="286" width="400" height="58" rx="8" stroke-width="0.5" class="n-gray"/>
+      <text class="tb" x="410" y="308" text-anchor="middle" dominant-baseline="central">Sinusoidal solution (d'Alembert)</text>
+      <text class="tm" x="410" y="330" text-anchor="middle" dominant-baseline="central">u = A cos(kx − ωt)   rightward</text>
+    </g>
+    <line x1="410" y1="344" x2="410" y2="376" class="ag"/>
+
+    <g class="ng" id="n-vph" onclick="showNode('vph')">
+      <rect x="240" y="376" width="340" height="58" rx="8" stroke-width="0.5" class="n-purple"/>
+      <text class="tb" x="410" y="398" text-anchor="middle" dominant-baseline="central">Phase speed</text>
+      <text class="tm" x="410" y="420" text-anchor="middle" dominant-baseline="central">v = ω / k     [m/s]</text>
+    </g>
+    <path d="M240 405 L170 405 L170 496" class="at"/>
+    <path d="M580 405 L650 405 L650 496" class="at"/>
+
+    <g class="ng" id="n-k" onclick="showNode('k')">
+      <rect x="40"  y="496" width="260" height="68" rx="8" stroke-width="0.5" class="n-teal"/>
+      <text class="tb" x="170" y="518" text-anchor="middle" dominant-baseline="central">Wavenumber  k = 2π/λ</text>
+      <text class="ts" x="170" y="538" text-anchor="middle" dominant-baseline="central">Spatial oscillation rate</text>
+      <text class="ts" x="170" y="554" text-anchor="middle" dominant-baseline="central">Units: rad/m</text>
+    </g>
+
+    <g class="ng" id="n-w" onclick="showNode('w')">
+      <rect x="520" y="496" width="260" height="68" rx="8" stroke-width="0.5" class="n-teal"/>
+      <text class="tb" x="650" y="518" text-anchor="middle" dominant-baseline="central">Angular freq  ω = 2π/T</text>
+      <text class="ts" x="650" y="538" text-anchor="middle" dominant-baseline="central">Temporal oscillation rate</text>
+      <text class="ts" x="650" y="554" text-anchor="middle" dominant-baseline="central">Units: rad/s</text>
+    </g>
+    <line x1="170" y1="564" x2="170" y2="618" class="at"/>
+    <line x1="650" y1="564" x2="650" y2="618" class="at"/>
+
+    <g class="ng" id="n-dir" onclick="showNode('dir')">
+      <rect x="40"  y="618" width="260" height="68" rx="8" stroke-width="0.5" class="n-coral"/>
+      <text class="tb" x="170" y="640" text-anchor="middle" dominant-baseline="central">Wave direction</text>
+      <text class="ts" x="170" y="660" text-anchor="middle" dominant-baseline="central">kx − ωt  →  rightward</text>
+      <text class="ts" x="170" y="676" text-anchor="middle" dominant-baseline="central">kx + ωt  →  leftward</text>
+    </g>
+
+    <g class="ng" id="n-unit" onclick="showNode('unit')">
+      <rect x="520" y="618" width="260" height="68" rx="8" stroke-width="0.5" class="n-coral"/>
+      <text class="tb" x="650" y="640" text-anchor="middle" dominant-baseline="central">Unit consistency</text>
+      <text class="ts" x="650" y="660" text-anchor="middle" dominant-baseline="central">c² needed: [m²/s²]·[m⁻²] = [s⁻²]</text>
+      <text class="ts" x="650" y="676" text-anchor="middle" dominant-baseline="central">c is squared — not optional</text>
+    </g>
+
+    <text font-family="'DM Sans',sans-serif" font-size="11" fill="var(--text-3)" x="410" y="748" text-anchor="middle">Click any node to expand details and a quiz question below</text>
+  </svg>
+
+  <div id="detailPanel"></div>
+
+  <div class="section-label">Wave explorer</div>
+  <div class="explorer-card">
+    <div class="explorer-header">
+      <span class="explorer-title">Interactive wave  u = A cos(kx ± ωt)</span>
+      <span class="formula-pill" id="fPill">kx − ωt  →  rightward</span>
+    </div>
+    <canvas id="wc"></canvas>
+    <div class="explorer-controls">
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span class="ctrl-name">Amplitude <em>A</em></span><span class="ctrl-val" id="vA">0.60</span></div>
+        <input type="range" id="sA" min="10" max="100" value="60" step="1">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span class="ctrl-name">Wavenumber <em>k</em> (rad/m)</span><span class="ctrl-val" id="vK">2.00</span></div>
+        <input type="range" id="sK" min="5" max="40" value="20" step="1">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span class="ctrl-name">Angular freq <em>ω</em> (rad/s)</span><span class="ctrl-val" id="vW">4.00</span></div>
+        <input type="range" id="sW" min="5" max="60" value="20" step="1">
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span class="ctrl-name">Direction</span></div>
+        <div class="dir-toggle">
+          <button class="dir-btn active" id="btnR" onclick="setDir(1)">kx − ωt  (right)</button>
+          <button class="dir-btn" id="btnL" onclick="setDir(-1)">kx + ωt  (left)</button>
+        </div>
+      </div>
+    </div>
+    <div class="readouts">
+      <div class="readout"><div class="readout-label">v = ω/k</div><div class="readout-val" id="rV">2.00 m/s</div></div>
+      <div class="readout"><div class="readout-label">λ = 2π/k</div><div class="readout-val" id="rL">3.14 m</div></div>
+      <div class="readout"><div class="readout-label">T = 2π/ω</div><div class="readout-val" id="rT">1.57 s</div></div>
+    </div>
+  </div>
+
+  <div class="quiz-card">
+    <div class="quiz-header">
+      <span class="quiz-tag">Chapter knowledge check</span>
+      <span class="quiz-type-tag">multiple choice</span>
+    </div>
+    <div class="quiz-body">
+      <p class="quiz-q">A wave u = 5 cos(2x − 6t) satisfies the wave equation. What is its phase speed, and in which direction does it travel?</p>
+      <div class="quiz-opts" id="quizOpts">
+        <button class="quiz-opt" onclick="chAnswer(this,false)">v = 2 m/s, rightward</button>
+        <button class="quiz-opt" onclick="chAnswer(this,true)">v = 3 m/s, rightward</button>
+        <button class="quiz-opt" onclick="chAnswer(this,false)">v = 6 m/s, rightward</button>
+        <button class="quiz-opt" onclick="chAnswer(this,false)">v = 3 m/s, leftward</button>
+      </div>
+      <div class="quiz-feedback" id="quizFb">
+        <strong>Correct approach:</strong> read k = 2 and ω = 6 directly from the argument (2x − 6t). Phase speed v = ω/k = 6/2 = 3 m/s. The minus sign confirms rightward travel. Verify: ∂²u/∂x² = −4u, ∂²u/∂t² = −36u → −4 = (1/9)(−36) → c = 3 ✓
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Ch 2-1 — Wave kinematics</span>
+  <a class="next-link" href="#">Ch 2-2 — Superposition →</a>
+</footer>
+
+<script>
+const NODES = {
+  rock:{
+    title:"Rock in a pond", color:"gray",
+    explain:"You throw a rock into a pond. Before the impact the surface was flat — zero curvature everywhere. The splash creates a local curvature, and the surrounding water, being continuous and incompressible, cannot simply absorb that — it <strong>must propagate the disturbance outward</strong>. This is what every wave is: a disturbance that the medium cannot contain locally.",
+    formula:"y(x, t) = f(x − ct)",
+    why:"Why this matters: the physical picture motivates everything. We need a mathematical object that captures 'curvature forces acceleration' — and that is the wave equation.",
+    quiz:{
+      type:"mc",
+      q:"What property of the water is essential for the wave to propagate outward after the rock hits?",
+      opts:["Its colour","Its continuity and incompressibility","Its temperature","Its surface tension"],
+      correct:1,
+      fb:"<strong>Continuity and incompressibility</strong> mean the water cannot simply open a gap where the rock hit — the disturbance must be transmitted to neighbouring fluid elements, forcing them to move, which propagates the wave."
+    }
+  },
+  ingr:{
+    title:"Two key ingredients", color:"gray",
+    explain:"Any wave needs exactly two things: <strong>curvature of the displacement in space</strong> (the medium is bent, so it wants to restore itself) and <strong>acceleration of the displacement in time</strong> (the element bounces back). These are not independent — they are proportional. The greater the curvature, the greater the restoring acceleration.",
+    formula:"spatial curvature  ∝  temporal acceleration",
+    why:"Why this matters: identifying these two ingredients tells us exactly which derivatives appear in the equation — second in space, second in time.",
+    quiz:{
+      type:"tf",
+      q:"True or false: a wave could be described by an equation relating the first spatial derivative (slope) to the second time derivative (acceleration).",
+      correct:false,
+      fb:"<strong>False.</strong> A nonzero first derivative (slope) simply means the function is tilted — a straight ramp has a constant slope but no curvature and does not oscillate. It is the <em>second</em> spatial derivative (the Laplacian — the curvature) that drives oscillation. An equation with only ∂y/∂x on one side is a transport/advection equation, not a wave equation."
+    }
+  },
+  lapl:{
+    title:"The Laplacian ∇²", color:"teal",
+    explain:"The Laplacian ∇²y = ∂²y/∂x² (in 1-D) measures how much a function <strong>bends</strong> at a point. A straight slope y = ax has ∂²y/∂x² = 0 — no curvature. A sinusoid has nonzero Laplacian everywhere. We need a nonzero Laplacian for a wave because a flat slope just translates in one direction without oscillating.",
+    formula:"∇²y = ∂²y/∂x²   (1-D)\n∇²u = ∂²u/∂x² + ∂²u/∂y²   (2-D)",
+    why:"Why this matters: the Laplacian is the spatial engine of the wave equation. Its sign and magnitude drive the temporal oscillation through the proportionality c².",
+    quiz:{
+      type:"mc",
+      q:"Compute the 1-D Laplacian of u(x) = 3x² + 2x − 5.",
+      opts:["∇²u = 6x + 2","∇²u = 6","∇²u = 2","∇²u = 3x²"],
+      correct:1,
+      fb:"<strong>∇²u = 6.</strong> First derivative: du/dx = 6x + 2. Second derivative: d²u/dx² = 6. Note that the linear term (2x) and the constant (−5) both vanish — only the quadratic term contributes to curvature."
+    }
+  },
+  accel:{
+    title:"∂²y/∂t² — acceleration", color:"teal",
+    explain:"∂²y/∂t² is the <strong>acceleration of a medium element</strong> — how quickly its velocity changes. Just as F = ma in Newton's law, the bent medium exerts a restoring force on each element, causing it to accelerate back toward equilibrium. The element overshoots, creating sustained oscillation.",
+    formula:"∂²y/∂t²  =  acceleration of medium element\n[units: m/s²]",
+    why:"Why this matters: this term is the familiar 'something is accelerating' from Newtonian mechanics, now applied to every infinitesimal element of a continuous medium.",
+    quiz:{
+      type:"mc",
+      q:"For u(x,t) = 5 cos(2x − 6t), what is ∂²u/∂t²?",
+      opts:["−180 cos(2x − 6t)","−36 cos(2x − 6t)","30 sin(2x − 6t)","180 cos(2x − 6t)"],
+      correct:0,
+      fb:"<strong>∂²u/∂t² = −180 cos(2x − 6t).</strong> First: ∂u/∂t = 30 sin(2x − 6t). Second: ∂²u/∂t² = −180 cos(2x − 6t). The factor is −ω²A = −36 × 5 = −180."
+    }
+  },
+  weq:{
+    title:"The wave equation", color:"purple",
+    explain:"Putting both ingredients together: <strong>acceleration is proportional to curvature</strong>. The constant must be c² (squared) so that units balance — [m/s²] on the left, [m⁻²] from the Laplacian, so the constant must carry [m²/s²]. This PDE describes sound, light (approximately), water waves, seismic waves and more.",
+    formula:"∂²y/∂t² = c² ∂²y/∂x²",
+    why:"Why this matters: any function satisfying this PDE is a valid wave. The equation constrains the relationship between spatial and temporal curvature — it does not specify the wave shape.",
+    quiz:{
+      type:"mc",
+      q:"Does u(x,t) = x² + t² satisfy the 1-D wave equation? (Hint: compute both second derivatives.)",
+      opts:["Yes, with c = 1","Yes, with c = 2","No — the wave equation is not satisfied for all t","No — the function has no oscillations"],
+      correct:2,
+      fb:"<strong>No.</strong> ∂²u/∂x² = 2 and ∂²u/∂t² = 2. The wave equation would require 2 = c² × 2, so c² = 1 — but this must hold for all x and t. Here both sides are constants and they happen to match, but physically x²+t² does not describe a propagating wave — it satisfies the equation only trivially and has no travelling-wave character."
+    }
+  },
+  sol:{
+    title:"Sinusoidal solution", color:"gray",
+    explain:"The most general solution is <strong>any function f(x − ct)</strong> (rightward) or f(x + ct) (leftward). Sinusoids are the natural special case. Substituting u = A cos(kx − ωt) into the wave equation forces ω/k = c. By Fourier's theorem, any wave can be decomposed into sinusoids — so understanding the sinusoidal case is equivalent to understanding all waves.",
+    formula:"u = A cos(kx − ωt)   [rightward]\nu = A cos(kx + ωt)   [leftward]\n\nrequires: ω/k = c",
+    why:"Why this matters: sinusoids are the eigenfunctions of the wave equation. Once you understand A, k and ω, you understand everything about wave propagation.",
+    quiz:{
+      type:"mc",
+      q:"Does u(x,t) = 5 cos(2x − 6t) satisfy the wave equation, and if so what is c?",
+      opts:["Yes, c = 2","Yes, c = 3","Yes, c = 6","No, it does not satisfy it"],
+      correct:1,
+      fb:"<strong>Yes, c = 3.</strong> ∂²u/∂x² = −20 cos(2x−6t), ∂²u/∂t² = −180 cos(2x−6t). The ratio gives c² = 180/20 = 9, so c = 3. Equivalently, v = ω/k = 6/2 = 3."
+    }
+  },
+  vph:{
+    title:"Phase speed v = ω/k", color:"purple",
+    explain:"Substitute u = A cos(kx − ωt) into ∂²y/∂t² = c²∂²y/∂x². Left side: −ω²u. Right side: −c²k²u. For equality: c = ω/k. This is the speed at which any surface of constant phase (kx − ωt = const) moves through space — hence <strong>phase speed</strong>.",
+    formula:"v = ω/k   [m/s]\n\nproof: −ω²u = c²(−k²u)\n→ c² = ω²/k²\n→ c = ω/k",
+    why:"Why this matters: v = ω/k is the central formula of wave kinematics. It connects the two fundamental parameters and gives precise meaning to 'wave speed'.",
+    quiz:{
+      type:"fill",
+      q:"A wave has wavenumber k = 4 rad/m and angular frequency ω = 20 rad/s. What is its phase speed in m/s?",
+      answer:"5",
+      fb:"<strong>v = ω/k = 20/4 = 5 m/s.</strong> The phase speed is simply the ratio of temporal frequency to spatial frequency. You can verify dimensionally: [rad/s] / [rad/m] = m/s."
+    }
+  },
+  k:{
+    title:"Wavenumber k = 2π/λ", color:"teal",
+    explain:"The wavenumber k tells you <strong>how rapidly the wave oscillates as you move through space</strong>. One full oscillation spans one wavelength λ, corresponding to 2π radians of phase, so k = 2π/λ. Large k → short λ → tightly packed crests. The Laplacian of A cos(kx) is −k²A cos(kx), so k² is the spatial frequency entering the wave equation directly.",
+    formula:"k = 2π/λ   [rad/m]\n\n∂²/∂x² [A cos(kx)] = −k² A cos(kx)",
+    why:"Why this matters: k and ω are the two fundamental parameters of a sinusoidal wave. Everything else — wavelength, period, phase speed — is derived from them.",
+    quiz:{
+      type:"mc",
+      q:"A wave has wavelength λ = 0.5 m. What is its wavenumber k?",
+      opts:["k = 0.5 rad/m","k = π rad/m","k = 4π rad/m","k = 2 rad/m"],
+      correct:2,
+      fb:"<strong>k = 2π/λ = 2π/0.5 = 4π ≈ 12.6 rad/m.</strong> Shorter wavelength → larger wavenumber. Notice that halving λ doubles k, which quadruples k² and therefore quadruples the spatial curvature term in the wave equation."
+    }
+  },
+  w:{
+    title:"Angular frequency ω = 2π/T", color:"teal",
+    explain:"The angular frequency ω tells you <strong>how rapidly the wave oscillates in time</strong>. One full oscillation per period T corresponds to 2π radians of phase, so ω = 2π/T = 2πf. It is the temporal mirror of k: ∂²u/∂t² = −ω²u, so ω² enters the time side of the wave equation exactly as k² enters the space side.",
+    formula:"ω = 2π/T = 2πf   [rad/s]\n\n∂²/∂t² [A cos(ωt)] = −ω² A cos(ωt)",
+    why:"Why this matters: ω is what you control when you choose a frequency — a tuning fork, a radio station, a laser. Its ratio with k gives the phase speed.",
+    quiz:{
+      type:"mc",
+      q:"A wave has period T = 0.25 s. What is its angular frequency ω, and what is its ordinary frequency f?",
+      opts:["ω = π/2 rad/s, f = 0.25 Hz","ω = 8π rad/s, f = 4 Hz","ω = 4 rad/s, f = 4 Hz","ω = 2π rad/s, f = 1 Hz"],
+      correct:1,
+      fb:"<strong>ω = 2π/T = 2π/0.25 = 8π ≈ 25.1 rad/s, and f = 1/T = 4 Hz.</strong> Note the relationship ω = 2πf — angular frequency is ordinary frequency scaled by 2π to convert cycles to radians."
+    }
+  },
+  dir:{
+    title:"Wave direction", color:"coral",
+    explain:"For a crest at (x₁, t₁): kx₁ − ωt₁ = C. At a later time t₂ > t₁ the crest is at x₂ where kx₂ − ωt₂ = C. Subtracting: k(x₂−x₁) = ω(t₂−t₁), so x₂−x₁ = (ω/k)(t₂−t₁) > 0 — the crest moved <strong>rightward</strong>. Replacing minus with plus reverses the sign: leftward travel.",
+    formula:"kx − ωt = const  →  rightward\n  dx/dt = +ω/k = +v\n\nkx + ωt = const  →  leftward\n  dx/dt = −ω/k = −v",
+    why:"Why this matters: the sign of ωt is easy to confuse. Tracking a crest gives the cleanest proof — it should be your go-to argument.",
+    quiz:{
+      type:"tf",
+      q:"True or false: u(x,t) = A cos(kx + ωt) describes a wave travelling in the positive x direction.",
+      correct:false,
+      fb:"<strong>False.</strong> The plus sign means kx + ωt = constant → x = (C − ωt)/k, so dx/dt = −ω/k < 0. The crest moves in the negative x direction — leftward. Only kx − ωt gives rightward propagation."
+    }
+  },
+  unit:{
+    title:"Unit consistency", color:"coral",
+    explain:"Left side ∂²y/∂t²: units are [m·s⁻²]. Right side c²·∂²y/∂x²: the Laplacian has units [m·m⁻²] = [m⁻¹]. So c² must carry [m²·s⁻²], meaning c is in m/s. <strong>c must be squared</strong> — writing c·∂²y/∂x² would give units [m/s · m⁻¹] = [s⁻¹], which cannot equal [m·s⁻²].",
+    formula:"[∂²y/∂t²]     =  m · s⁻²\n[c² · ∂²y/∂x²] =  (m²s⁻²) · (m · m⁻²)\n               =  m · s⁻²   ✓",
+    why:"Why this matters: dimensional analysis is a powerful check. Here it tells you that c must appear squared — and also that the wave equation cannot have a first time derivative on the left (that would be a diffusion equation).",
+    quiz:{
+      type:"mc",
+      q:"If you mistakenly wrote the wave equation as ∂y/∂t = c ∂²y/∂x², what kind of equation would that actually be?",
+      opts:["Still a wave equation, just slower","A diffusion (heat) equation","An advection equation","An equation with no physical meaning"],
+      correct:1,
+      fb:"<strong>A diffusion (heat) equation.</strong> ∂u/∂t = D ∂²u/∂x² is the standard heat equation — it describes how temperature spreads out over time, not how a wave propagates. Solutions decay exponentially rather than oscillating. This is why the <em>second</em> time derivative is essential for wave behaviour."
+    }
+  }
+};
+
+const colorMap   = {gray:'var(--gray-50)',  purple:'var(--purple-50)', teal:'var(--teal-50)',  coral:'var(--coral-50)'};
+const borderMap  = {gray:'var(--gray-400)', purple:'var(--purple-400)',teal:'var(--teal-600)', coral:'var(--coral-600)'};
+
+let currentNode = null;
+
+function quizHTML(q, nodeId){
+  if(q.type === 'mc'){
+    const opts = q.opts.map((o,i)=>
+      `<button class="dq-opt" onclick="dqAnswerMC('${nodeId}',this,${i===q.correct})">${o}</button>`
+    ).join('');
+    return `<div class="dq-opts">${opts}</div>`;
+  }
+  if(q.type === 'tf'){
+    return `<div class="dq-tf">
+      <button class="dq-tf-btn" onclick="dqAnswerTF('${nodeId}',this,${q.correct===true})">True</button>
+      <button class="dq-tf-btn" onclick="dqAnswerTF('${nodeId}',this,${q.correct===false})">False</button>
+    </div>`;
+  }
+  if(q.type === 'fill'){
+    return `<input class="dq-fill" id="fill_${nodeId}" placeholder="Type your answer…" onkeydown="if(event.key==='Enter')dqAnswerFill('${nodeId}','${q.answer.replace(/'/g,"\\'")}')">
+    <button class="dq-submit" onclick="dqAnswerFill('${nodeId}','${q.answer.replace(/'/g,"\\'")}')">Check ↵</button>`;
+  }
+  return '';
+}
+
+function typeLabel(t){ return {mc:'multiple choice',tf:'true / false',fill:'fill in the blank'}[t]||t; }
+
+function showNode(id){
+  const data = NODES[id];
+  if(!data) return;
+
+  document.querySelectorAll('.ng').forEach(g=>g.classList.remove('sel'));
+
+  if(currentNode === id){
+    currentNode = null;
+    document.getElementById('detailPanel').innerHTML = '';
+    document.getElementById('detailPanel').className = '';
+    return;
+  }
+  currentNode = id;
+  document.getElementById('n-'+id).classList.add('sel');
+
+  const bc = borderMap[data.color];
+  const bg = colorMap[data.color];
+  const q  = data.quiz;
+
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = `
+    <div class="dp-wrap" style="border-color:${bc}">
+      <div class="dp-head" style="background:${bg}">
+        <span class="dp-title">${data.title}</span>
+        <button class="dp-close" onclick="closePanel()">close ×</button>
+      </div>
+      <div class="dp-body">
+        <div class="dp-explain">${data.explain}</div>
+        <div class="dp-right">
+          <div class="dp-formula" style="background:${bg};border-color:${bc}">${data.formula}</div>
+          <div class="dp-why" style="border-left-color:${bc}">${data.why}</div>
+        </div>
+      </div>
+      <div class="dp-quiz">
+        <div class="dq-label">
+          <span>Quick check</span>
+          <span class="dq-type">${typeLabel(q.type)}</span>
+        </div>
+        <p class="dq-q">${q.q}</p>
+        <div id="dqBody_${id}">${quizHTML(q, id)}</div>
+        <div class="dq-feedback" id="dqFb_${id}"></div>
+        <button class="dq-retry" id="dqRetry_${id}" style="display:none" onclick="retryQuiz('${id}')">↺ try again</button>
+      </div>
+    </div>`;
+  panel.className = 'open';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function closePanel(){
+  currentNode = null;
+  document.querySelectorAll('.ng').forEach(g=>g.classList.remove('sel'));
+  const p = document.getElementById('detailPanel');
+  p.innerHTML = ''; p.className = '';
+}
+
+function showFeedback(nodeId, correct){
+  const fb = document.getElementById('dqFb_'+nodeId);
+  const retry = document.getElementById('dqRetry_'+nodeId);
+  const data = NODES[nodeId];
+  fb.innerHTML = (correct
+    ? '<strong>Correct!</strong> '
+    : '<strong>Not quite.</strong> ') + data.quiz.fb;
+  fb.className = 'dq-feedback show';
+  if(!correct) retry.style.display = 'block';
+}
+
+function dqAnswerMC(nodeId, btn, correct){
+  const body = document.getElementById('dqBody_'+nodeId);
+  body.querySelectorAll('.dq-opt').forEach(b=>{
+    b.disabled = true;
+    if(b === btn) b.classList.add(correct ? 'correct' : 'wrong');
+    else if(!correct){
+      const idx = [...body.querySelectorAll('.dq-opt')].indexOf(b);
+      if(idx === NODES[nodeId].quiz.correct) b.classList.add('correct');
+    }
+  });
+  showFeedback(nodeId, correct);
+}
+
+function dqAnswerTF(nodeId, btn, correct){
+  const body = document.getElementById('dqBody_'+nodeId);
+  body.querySelectorAll('.dq-tf-btn').forEach(b=>{b.disabled=true;});
+  btn.classList.add(correct ? 'correct' : 'wrong');
+  if(!correct){
+    const other = [...body.querySelectorAll('.dq-tf-btn')].find(b=>b!==btn);
+    if(other) other.classList.add('correct');
+  }
+  showFeedback(nodeId, correct);
+}
+
+function dqAnswerFill(nodeId, answer){
+  const input = document.getElementById('fill_'+nodeId);
+  if(!input || input.disabled) return;
+  const val = input.value.trim().toLowerCase().replace(/\s/g,'');
+  const correct = val === answer.toLowerCase().replace(/\s/g,'');
+  input.disabled = true;
+  input.style.borderColor = correct ? 'var(--teal-600)' : 'var(--coral-600)';
+  const submit = input.nextElementSibling;
+  if(submit) submit.disabled = true;
+  showFeedback(nodeId, correct);
+}
+
+function retryQuiz(nodeId){
+  const data = NODES[nodeId];
+  document.getElementById('dqBody_'+nodeId).innerHTML = quizHTML(data.quiz, nodeId);
+  const fb = document.getElementById('dqFb_'+nodeId);
+  fb.className = 'dq-feedback'; fb.innerHTML = '';
+  document.getElementById('dqRetry_'+nodeId).style.display = 'none';
+}
+
+/* ── Wave explorer ── */
+let A=0.6, k=2.0, w=4.0, dir=1, t=0;
+const canvas = document.getElementById('wc');
+const ctx = canvas.getContext('2d');
+const DOT_FRAC = 0.22;
+
+function setDir(d){
+  dir=d;
+  document.getElementById('btnR').classList.toggle('active',d===1);
+  document.getElementById('btnL').classList.toggle('active',d===-1);
+  document.getElementById('fPill').textContent = d===1 ? 'kx − ωt  →  rightward' : 'kx + ωt  →  leftward';
+}
+function updateReadouts(){
+  document.getElementById('rV').textContent=(w/k).toFixed(2)+' m/s';
+  document.getElementById('rL').textContent=(2*Math.PI/k).toFixed(2)+' m';
+  document.getElementById('rT').textContent=(2*Math.PI/w).toFixed(2)+' s';
+}
+function wire(id,valId,min,max,dec,setter){
+  document.getElementById(id).addEventListener('input',function(){
+    const frac=(this.value-+this.min)/(+this.max-+this.min);
+    const v=min+(max-min)*frac;
+    document.getElementById(valId).textContent=v.toFixed(dec);
+    setter(v); updateReadouts();
+  });
+}
+wire('sA','vA',0.1,1.0,2,v=>A=v);
+wire('sK','vK',0.5,4.0,2,v=>k=v);
+wire('sW','vW',0.5,6.0,2,v=>w=v);
+
+function draw(){
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=canvas.offsetWidth*dpr; canvas.height=canvas.offsetHeight*dpr;
+  const W=canvas.width, H=canvas.height;
+  const dark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  ctx.clearRect(0,0,W,H);
+  const midY=H/2, scaleY=H*.38, xScale=(4*Math.PI)/W, dotX=W*DOT_FRAC;
+
+  ctx.setLineDash([4,6]);
+  ctx.strokeStyle=dark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,midY-scaleY*A);ctx.lineTo(W,midY-scaleY*A);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,midY+scaleY*A);ctx.lineTo(W,midY+scaleY*A);ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle=dark?'rgba(255,255,255,0.12)':'rgba(0,0,0,0.12)';
+  ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(0,midY);ctx.lineTo(W,midY);ctx.stroke();
+
+  ctx.strokeStyle=dark?'#AFA9EC':'#534AB7';
+  ctx.lineWidth=2*dpr;
+  ctx.beginPath();
+  for(let px=0;px<=W;px++){
+    const py=midY-A*Math.cos(k*px*xScale-dir*w*t)*scaleY;
+    px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle='#D85A30'; ctx.lineWidth=1.2*dpr;
+  ctx.setLineDash([4*dpr,4*dpr]);
+  ctx.beginPath();ctx.moveTo(dotX,0);ctx.lineTo(dotX,H);ctx.stroke();
+  ctx.setLineDash([]);
+
+  const dotY=midY-A*Math.cos(k*dotX*xScale-dir*w*t)*scaleY;
+  ctx.fillStyle='#D85A30';
+  ctx.beginPath();ctx.arc(dotX,dotY,5*dpr,0,Math.PI*2);ctx.fill();
+
+  ctx.fillStyle='#D85A30';
+  ctx.font=`${10*dpr}px 'DM Sans',sans-serif`;
+  ctx.textAlign='center';
+  ctx.fillText('fixed x',dotX,H-6*dpr);
+
+  ctx.fillStyle=dark?'rgba(255,255,255,0.28)':'rgba(0,0,0,0.28)';
+  ctx.font=`${11*dpr}px 'DM Sans',sans-serif`;
+  ctx.textAlign='right';
+  ctx.fillText('x →',W-8*dpr,midY-8*dpr);
+}
+
+let chAnswered=false;
+function chAnswer(btn,correct){
+  if(chAnswered)return; chAnswered=true;
+  document.querySelectorAll('.quiz-opt').forEach(b=>{
+    b.disabled=true;
+    if(b.getAttribute('onclick').includes('true')) b.classList.add('correct');
+  });
+  if(!correct) btn.classList.add('wrong');
+  document.getElementById('quizFb').style.display='block';
+}
+
+function loop(){ t+=0.016; draw(); requestAnimationFrame(loop); }
+updateReadouts(); loop();
+</script>
+</body>
+</html>

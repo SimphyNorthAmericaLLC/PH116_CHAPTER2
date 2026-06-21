@@ -1,0 +1,533 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; }
+  .wrap { font-family: var(--font-sans); color: var(--color-text-primary); padding: 1rem 0; max-width: 680px; }
+
+  .stage-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .stage-btn {
+    font-size: 12px; padding: 5px 12px; border-radius: 20px;
+    border: 0.5px solid var(--color-border-secondary);
+    background: transparent; color: var(--color-text-secondary);
+    cursor: pointer; transition: all .18s;
+  }
+  .stage-btn.active {
+    background: var(--color-background-info);
+    color: var(--color-text-info);
+    border-color: var(--color-border-info);
+    font-weight: 500;
+  }
+  .stage-btn:hover:not(.active) { background: var(--color-background-secondary); }
+
+  .diagram-wrap { width: 100%; margin-bottom: 1rem; }
+  .diagram-wrap svg { display: block; width: 100%; }
+
+  .deriv-card {
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    padding: 1rem 1.25rem;
+    margin-bottom: .75rem;
+  }
+  .deriv-card h3 {
+    font-size: 13px; font-weight: 500;
+    color: var(--color-text-secondary);
+    margin-bottom: .5rem; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .math-block {
+    font-family: var(--font-mono); font-size: 14px;
+    color: var(--color-text-primary);
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: .6rem .9rem; margin: .4rem 0;
+    line-height: 1.7;
+  }
+  .math-inline { font-family: var(--font-mono); font-size: 13px; }
+  .explanation { font-size: 14px; line-height: 1.7; color: var(--color-text-primary); }
+  .key-result {
+    border-left: 3px solid var(--color-border-info);
+    background: var(--color-background-info);
+    color: var(--color-text-info);
+    border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+    padding: .7rem 1rem; margin: .5rem 0;
+    font-family: var(--font-mono); font-size: 14px; font-weight: 500;
+  }
+  .note { font-size: 12px; color: var(--color-text-secondary); margin-top: .4rem; }
+
+  .slider-row { display: flex; align-items: center; gap: 10px; margin: .5rem 0; }
+  .slider-row label { font-size: 13px; color: var(--color-text-secondary); width: 90px; flex-shrink: 0; }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-row span { font-size: 13px; font-family: var(--font-mono); width: 48px; text-align: right; }
+
+  .step-nav { display: flex; gap: 8px; margin-top: .75rem; }
+  .step-btn {
+    padding: 6px 14px; font-size: 13px; border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary);
+    background: transparent; color: var(--color-text-primary); cursor: pointer;
+    transition: background .15s;
+  }
+  .step-btn:hover { background: var(--color-background-secondary); }
+  .step-btn:disabled { opacity: .35; cursor: default; }
+</style>
+
+<div class="wrap">
+  <h2 class="sr-only">Wave equation derivation — interactive geometry and force analysis for a taut string</h2>
+
+  <div class="stage-nav" id="stageNav"></div>
+
+  <div class="diagram-wrap" id="diagWrap"></div>
+  <div id="content"></div>
+</div>
+
+<script>
+const STAGES = [
+  { id: 0, label: "Setup" },
+  { id: 1, label: "Geometry" },
+  { id: 2, label: "Forces" },
+  { id: 3, label: "Newton's 2nd law" },
+  { id: 4, label: "Small-angle approx." },
+  { id: 5, label: "Wave equation" },
+];
+
+let cur = 0;
+
+// ── helpers ────────────────────────────────────────────────────────────────
+function svgNS(tag, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  return el;
+}
+function mkSVG(w, h) {
+  const svg = svgNS("svg", {
+    viewBox: `0 0 ${w} ${h}`, width: "100%",
+    role: "img",
+  });
+  const defs = svgNS("defs");
+  const marker = svgNS("marker", { id: "arr", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse" });
+  const mpath = svgNS("path", { d: "M2 1L8 5L2 9", fill: "none", stroke: "context-stroke", "stroke-width": "1.5", "stroke-linecap": "round", "stroke-linejoin": "round" });
+  marker.appendChild(mpath); defs.appendChild(marker); svg.appendChild(defs);
+  return svg;
+}
+function text(svg, x, y, txt, cls, extra) {
+  const el = svgNS("text", { x, y, class: cls, ...extra });
+  el.textContent = txt; svg.appendChild(el); return el;
+}
+function line(svg, x1, y1, x2, y2, attrs) {
+  svg.appendChild(svgNS("line", { x1, y1, x2, y2, ...attrs }));
+}
+function arrow(svg, x1, y1, x2, y2, col, sw) {
+  svg.appendChild(svgNS("line", {
+    x1, y1, x2, y2, stroke: col || "var(--color-text-secondary)",
+    "stroke-width": sw || 1.5, "marker-end": "url(#arr)", fill: "none"
+  }));
+}
+function path(svg, d, attrs) {
+  svg.appendChild(svgNS("path", { d, fill: "none", ...attrs }));
+}
+function rect(svg, x, y, w, h, attrs) {
+  svg.appendChild(svgNS("rect", { x, y, width: w, height: h, ...attrs }));
+}
+
+// ── Stage diagrams ─────────────────────────────────────────────────────────
+
+function drawSetup() {
+  const svg = mkSVG(680, 200);
+
+  // baseline axis
+  line(svg, 40, 140, 640, 140, { stroke: "var(--color-border-secondary)", "stroke-width": 0.5, "stroke-dasharray": "4 4" });
+  text(svg, 646, 144, "x", "ts", { "text-anchor": "start" });
+  text(svg, 310, 158, "equilibrium (unperturbed)", "ts", { "text-anchor": "middle" });
+
+  // string curve
+  const pts = [];
+  for (let i = 0; i <= 60; i++) {
+    const xp = 40 + i * 10;
+    const yp = 140 - 28 * Math.sin(i * Math.PI / 60);
+    pts.push(`${i === 0 ? "M" : "L"}${xp} ${yp}`);
+  }
+  path(svg, pts.join(" "), { stroke: "#378ADD", "stroke-width": 2.5 });
+
+  // endpoint tacks
+  rect(svg, 33, 133, 7, 14, { rx: "2", fill: "#888780" });
+  rect(svg, 640, 133, 7, 14, { rx: "2", fill: "#888780" });
+
+  // y-axis
+  arrow(svg, 120, 150, 120, 55, "var(--color-text-secondary)", 1.2);
+  text(svg, 124, 52, "y (transverse displacement)", "ts", { "text-anchor": "start" });
+
+  // labels
+  text(svg, 310, 125, "u(x, t)", "th", { "text-anchor": "middle", fill: "#185FA5" });
+  text(svg, 40, 125, "x = 0", "ts", { "text-anchor": "middle" });
+  text(svg, 647, 125, "x = L", "ts", { "text-anchor": "start" });
+
+  return svg;
+}
+
+function drawGeometry(theta) {
+  // theta in degrees
+  const svg = mkSVG(680, 280);
+  const x0 = 140, y0 = 200, dx = 300;
+  const th = theta * Math.PI / 180;
+  const x1 = x0 + dx;
+  const y1 = y0 - dx * Math.tan(th);
+
+  // horizontal baseline
+  line(svg, x0 - 30, y0, x1 + 60, y0, { stroke: "var(--color-border-secondary)", "stroke-width": 0.5, "stroke-dasharray": "4 4" });
+
+  // segment
+  path(svg, `M${x0} ${y0} Q${x0 + dx / 2} ${(y0 + y1) / 2 - 30} ${x1} ${y1}`, {
+    stroke: "#378ADD", "stroke-width": 3
+  });
+
+  // Δx brace
+  line(svg, x0, y0 + 22, x1, y0 + 22, { stroke: "var(--color-border-secondary)", "stroke-width": 0.8 });
+  line(svg, x0, y0 + 18, x0, y0 + 26, { stroke: "var(--color-border-secondary)", "stroke-width": 0.8 });
+  line(svg, x1, y0 + 18, x1, y0 + 26, { stroke: "var(--color-border-secondary)", "stroke-width": 0.8 });
+  text(svg, x0 + dx / 2, y0 + 38, "Δx", "ts", { "text-anchor": "middle", "font-family": "var(--font-mono)" });
+
+  // vertical displacement
+  line(svg, x1 + 8, y0, x1 + 8, y1, { stroke: "var(--color-border-secondary)", "stroke-width": 0.8 });
+  text(svg, x1 + 28, (y0 + y1) / 2 + 4, "Δu", "ts", { "text-anchor": "start", "font-family": "var(--font-mono)" });
+
+  // angle arc
+  const arcR = 40;
+  const arcPath = `M${x1 + arcR} ${y1} A${arcR} ${arcR} 0 0 1 ${x1 + arcR * Math.cos(-th)} ${y1 + arcR * Math.sin(-th)}`;
+  path(svg, arcPath, { stroke: "#E24B4A", "stroke-width": 1 });
+  text(svg, x1 + arcR + 14, y1 + 14, "θ", "ts", { fill: "#A32D2D", "font-family": "var(--font-mono)" });
+
+  // tangent slope label (right)
+  const sl = Math.tan(th).toFixed(3);
+  text(svg, x1 - 20, y1 - 14, `slope = ∂u/∂x`, "ts", { "text-anchor": "end", fill: "#185FA5", "font-family": "var(--font-mono)" });
+  text(svg, x1 - 20, y1 - 28, `tan θ = ${sl}`, "ts", { "text-anchor": "end", fill: "#5F5E5A", "font-family": "var(--font-mono)" });
+
+  // x labels
+  text(svg, x0, y0 + 60, "x", "ts", { "text-anchor": "middle", "font-family": "var(--font-mono)" });
+  text(svg, x1, y0 + 60, "x + Δx", "ts", { "text-anchor": "middle", "font-family": "var(--font-mono)" });
+
+  return svg;
+}
+
+function drawForces(theta) {
+  const svg = mkSVG(680, 300);
+  const cx = 320, cy = 185, dx = 220;
+  const th = theta * Math.PI / 180;
+
+  const x0 = cx - dx, y0 = cy;
+  const x1 = cx + dx, y1 = cy - 2 * dx * Math.tan(th);
+
+  // segment
+  path(svg, `M${x0} ${y0} Q${cx} ${(y0 + y1) / 2 - 50} ${x1} ${y1}`, {
+    stroke: "#378ADD", "stroke-width": 2.5
+  });
+
+  // segment fill hint
+  const T_COLOR = "#BA7517";
+  const T_COLOR2 = "#E24B4A";
+
+  // Left tension: horizontal + vertical components (pointing left+down for compression-free)
+  const Tx_L = 70, Ty_L = 45;
+  arrow(svg, x0, y0, x0 - Tx_L, y0, T_COLOR, 2);
+  arrow(svg, x0, y0, x0, y0 + Ty_L, T_COLOR2, 2);
+  // resultant T at left
+  arrow(svg, x0, y0, x0 - Tx_L, y0 + Ty_L, "#63380a", 2);
+  text(svg, x0 - Tx_L - 8, y0 + Ty_L + 14, "T(x)", "ts", { "text-anchor": "end", fill: "#63380a", "font-family": "var(--font-mono)" });
+  text(svg, x0 - Tx_L / 2 - 4, y0 - 8, "-T cosθ₁", "ts", { "text-anchor": "middle", fill: T_COLOR, "font-family": "var(--font-mono)" });
+  text(svg, x0 - Tx_L - 22, y0 + Ty_L / 2, "-T sinθ₁", "ts", { "text-anchor": "end", fill: T_COLOR2, "font-family": "var(--font-mono)" });
+
+  // Right tension: pointing right and up
+  const Tx_R = 80, Ty_R = 65;
+  arrow(svg, x1, y1, x1 + Tx_R, y1, T_COLOR, 2);
+  arrow(svg, x1, y1, x1, y1 - Ty_R, T_COLOR2, 2);
+  arrow(svg, x1, y1, x1 + Tx_R, y1 - Ty_R, "#63380a", 2);
+  text(svg, x1 + Tx_R + 8, y1 - Ty_R, "T(x+Δx)", "ts", { "text-anchor": "start", fill: "#63380a", "font-family": "var(--font-mono)" });
+  text(svg, x1 + Tx_R / 2 + 8, y1 - 10, "+T cosθ₂", "ts", { "text-anchor": "start", fill: T_COLOR, "font-family": "var(--font-mono)" });
+  text(svg, x1 + Tx_R + 12, y1 - Ty_R / 2 + 4, "+T sinθ₂", "ts", { "text-anchor": "start", fill: T_COLOR2, "font-family": "var(--font-mono)" });
+
+  // weight arrow (gravity)
+  arrow(svg, cx, cy - 30, cx, cy - 30 + 50, "#7F77DD", 2);
+  text(svg, cx + 8, cy - 30 + 28, "ρΔx · g", "ts", { "text-anchor": "start", fill: "#534AB7", "font-family": "var(--font-mono)" });
+
+  // angle arcs
+  text(svg, x0 + 18, y0 + 14, "θ₁", "ts", { fill: "#A32D2D", "font-family": "var(--font-mono)" });
+  text(svg, x1 - 24, y1 - 18, "θ₂", "ts", { fill: "#A32D2D", "font-family": "var(--font-mono)" });
+
+  // labels
+  text(svg, cx - 18, cy - 60, "string segment", "ts", { "text-anchor": "middle", fill: "#185FA5" });
+  text(svg, cx - 60, cy - 72, "mass = ρ Δx", "ts", { "text-anchor": "middle", "font-family": "var(--font-mono)" });
+
+  return svg;
+}
+
+function drawSmallAngle(theta) {
+  const svg = mkSVG(680, 200);
+  const th = theta * Math.PI / 180;
+  const sinVal = Math.sin(th).toFixed(4);
+  const tanVal = Math.tan(th).toFixed(4);
+  const err = Math.abs(Math.sin(th) - Math.tan(th)) / Math.abs(Math.tan(th)) * 100;
+
+  // Comparison plot
+  const W = 360, H = 140, ox = 60, oy = 170;
+  line(svg, ox, oy, ox + W, oy, { stroke: "var(--color-border-secondary)", "stroke-width": 0.5 });
+  line(svg, ox, oy, ox, oy - H - 10, { stroke: "var(--color-border-secondary)", "stroke-width": 0.5 });
+  text(svg, ox + W + 6, oy + 4, "θ (°)", "ts");
+  text(svg, ox - 6, oy - H - 14, "value", "ts", { "text-anchor": "end" });
+
+  // sin curve
+  const sinPts = [], tanPts = [];
+  for (let i = 0; i <= 80; i++) {
+    const px = ox + i * (W / 80);
+    const rad = i * Math.PI / 180;
+    const sy = oy - Math.sin(rad) * H;
+    const ty = oy - Math.min(Math.tan(rad), 1.05) * H;
+    sinPts.push(`${i === 0 ? "M" : "L"}${px} ${sy}`);
+    tanPts.push(`${i === 0 ? "M" : "L"}${px} ${ty}`);
+  }
+  path(svg, sinPts.join(" "), { stroke: "#378ADD", "stroke-width": 1.8 });
+  path(svg, tanPts.join(" "), { stroke: "#E24B4A", "stroke-width": 1.8, "stroke-dasharray": "5 3" });
+
+  // current angle marker
+  const px = ox + theta * (W / 80);
+  const sy = oy - Math.sin(th) * H;
+  const ty = oy - Math.min(Math.tan(th), 1.05) * H;
+  line(svg, px, oy + 5, px, oy - H - 5, { stroke: "var(--color-border-secondary)", "stroke-width": 0.6, "stroke-dasharray": "3 3" });
+  svg.appendChild(svgNS("circle", { cx: px, cy: sy, r: 4, fill: "#378ADD" }));
+  svg.appendChild(svgNS("circle", { cx: px, cy: ty, r: 4, fill: "#E24B4A" }));
+
+  // legend
+  text(svg, 450, 60, "sin θ", "ts", { fill: "#185FA5", "font-family": "var(--font-mono)" });
+  path(svg, `M430 58 L446 58`, { stroke: "#378ADD", "stroke-width": 2 });
+  text(svg, 450, 80, "tan θ  ≈ ∂u/∂x", "ts", { fill: "#A32D2D", "font-family": "var(--font-mono)" });
+  path(svg, `M430 78 L446 78`, { stroke: "#E24B4A", "stroke-width": 2, "stroke-dasharray": "4 3" });
+
+  // current values display
+  const vx = 450, vy = 105;
+  text(svg, vx, vy, `θ = ${theta}°`, "ts", { "font-family": "var(--font-mono)" });
+  text(svg, vx, vy + 18, `sin θ = ${sinVal}`, "ts", { fill: "#185FA5", "font-family": "var(--font-mono)" });
+  text(svg, vx, vy + 36, `tan θ = ${tanVal}`, "ts", { fill: "#A32D2D", "font-family": "var(--font-mono)" });
+  text(svg, vx, vy + 54, `error = ${err.toFixed(1)}%`, "ts", { fill: err < 5 ? "#3B6D11" : "#993C1D", "font-family": "var(--font-mono)" });
+
+  return svg;
+}
+
+function drawWaveEq() {
+  const svg = mkSVG(680, 220);
+
+  // animated wave
+  const t0 = Date.now();
+  function frame() {
+    const dt = (Date.now() - t0) / 1000;
+    // clear old wave paths
+    svg.querySelectorAll(".wave-path").forEach(e => e.remove());
+    const pts1 = [], pts2 = [];
+    for (let i = 0; i <= 120; i++) {
+      const x = 40 + i * (600 / 120);
+      const y1 = 110 - 35 * Math.sin(2 * Math.PI * (i / 120 - dt * 0.3));
+      const y2 = 110 - 35 * Math.sin(2 * Math.PI * (i / 120 + dt * 0.3));
+      pts1.push(`${i === 0 ? "M" : "L"}${x} ${y1}`);
+      pts2.push(`${i === 0 ? "M" : "L"}${x} ${y2}`);
+    }
+    const p1 = svgNS("path", { d: pts1.join(" "), class: "wave-path", fill: "none", stroke: "#378ADD", "stroke-width": 2 });
+    const p2 = svgNS("path", { d: pts2.join(" "), class: "wave-path", fill: "none", stroke: "#E24B4A", "stroke-width": 1.5, "stroke-dasharray": "5 3", opacity: "0.6" });
+    svg.appendChild(p1); svg.appendChild(p2);
+    requestAnimationFrame(frame);
+  }
+  frame();
+
+  // baseline
+  line(svg, 40, 110, 640, 110, { stroke: "var(--color-border-secondary)", "stroke-width": 0.5, "stroke-dasharray": "2 4" });
+
+  // speed label
+  text(svg, 340, 178, "→ wave speed: v = √(T/ρ)", "th", { "text-anchor": "middle", fill: "#185FA5", "font-family": "var(--font-mono)" });
+  text(svg, 480, 60, "right-traveling", "ts", { fill: "#185FA5" });
+  text(svg, 480, 80, "left-traveling", "ts", { fill: "#A32D2D" });
+
+  // arrow direction hints
+  arrow(svg, 420, 56, 450, 56, "#378ADD", 1.2);
+  arrow(svg, 440, 76, 410, 76, "#E24B4A", 1.2);
+
+  text(svg, 340, 205, "any superposition u(x,t) is a valid solution", "ts", { "text-anchor": "middle" });
+
+  return svg;
+}
+
+// ── Content blocks ──────────────────────────────────────────────────────────
+
+function makeCard(title, math, expl, extra) {
+  return `
+    <div class="deriv-card">
+      ${title ? `<h3>${title}</h3>` : ""}
+      ${math ? `<div class="math-block">${math}</div>` : ""}
+      ${expl ? `<p class="explanation">${expl}</p>` : ""}
+      ${extra || ""}
+    </div>`;
+}
+
+function stageContent(s) {
+  switch (s) {
+    case 0: return `
+      ${makeCard("The physical picture",
+        "u(x, t) — transverse displacement at position x, time t",
+        "We model the string as a continuous 1D medium with linear mass density ρ (kg/m) under uniform tension T (N). The string is assumed perfectly flexible — it exerts no bending resistance, only tension along the local tangent.",
+      )}
+      ${makeCard("What we want",
+        "",
+        "Starting from Newton's second law applied to an infinitesimal segment, we want to arrive at a PDE governing u(x,t). Drag the slider to adjust the segment geometry in the next step.",
+      )}`;
+
+    case 1:
+      return `
+      <div class="deriv-card">
+        <h3>Slope as a derivative</h3>
+        <div class="slider-row">
+          <label>Angle θ</label>
+          <input type="range" id="th1" min="1" max="40" value="18" step="1">
+          <span id="th1v">18°</span>
+        </div>
+        <div class="math-block">tan θ = Δu / Δx → ∂u/∂x &nbsp; (as Δx → 0)</div>
+        <p class="explanation">The angle θ between the string and the horizontal at any point is related to the local slope. This partial derivative is the key kinematic quantity.</p>
+      </div>
+      ${makeCard("Arc length of segment",
+        "ds = √(Δx² + Δu²) = Δx · √(1 + (∂u/∂x)²)",
+        "For small angles, ds ≈ Δx — the mass of the segment is simply ρΔx regardless of displacement.",
+      )}`;
+
+    case 2:
+      return `
+      <div class="deriv-card">
+        <h3>Tension vectors on the segment</h3>
+        <div class="slider-row">
+          <label>Angle θ</label>
+          <input type="range" id="th2" min="2" max="30" value="14" step="1">
+          <span id="th2v">14°</span>
+        </div>
+        <div class="math-block">
+F_x = T cosθ₂ − T cosθ₁ = 0 &nbsp; (inextensible)<br>
+F_y = T sinθ₂ − T sinθ₁ &nbsp; (net transverse force)
+        </div>
+        <p class="explanation">Tension T is constant in magnitude (inextensible string). The x-components cancel exactly. Only the difference in y-components produces a net force, driving transverse motion.</p>
+        <p class="note">For small angles: sin θ ≈ tan θ = ∂u/∂x, enabling the next step.</p>
+      </div>`;
+
+    case 3:
+      return `
+      ${makeCard("Mass of segment",
+        "dm = ρ · Δx",
+        "Since the string is nearly horizontal under small displacements, the segment length ≈ Δx.",
+      )}
+      ${makeCard("Net transverse force",
+        "F_y = T sinθ₂ − T sinθ₁ ≈ T (∂u/∂x)|_{x+Δx} − T (∂u/∂x)|_{x}",
+        "",
+      )}
+      ${makeCard("Newton's second law (transverse)",
+        "ρ Δx · ∂²u/∂t² = T · [(∂u/∂x)|_{x+Δx} − (∂u/∂x)|_{x}]",
+        "Divide both sides by Δx and take the limit Δx → 0:",
+      )}
+      <div class="key-result">ρ · ∂²u/∂t² = T · ∂²u/∂x²</div>`;
+
+    case 4:
+      return `
+      <div class="deriv-card">
+        <h3>When does sin θ ≈ tan θ hold?</h3>
+        <div class="slider-row">
+          <label>Angle θ</label>
+          <input type="range" id="th3" min="1" max="60" value="12" step="1">
+          <span id="th3v">12°</span>
+        </div>
+        <p class="explanation" style="margin-top:.5rem">
+          The approximation sin θ ≈ tan θ ≈ ∂u/∂x holds when θ ≪ 1 rad (small displacements). 
+          Watch the error value — it stays under 1% for angles below ~8°.
+        </p>
+      </div>
+      ${makeCard("What we're really assuming",
+        "(∂u/∂x)² ≪ 1",
+        "This is the linearisation condition. The wave equation is a linear PDE — valid only for small-amplitude waves on a taut string. Large amplitudes lead to nonlinear corrections.",
+      )}`;
+
+    case 5:
+      return `
+      ${makeCard("The 1D wave equation",
+        "∂²u/∂t² = (T/ρ) · ∂²u/∂x²",
+        "",
+      )}
+      <div class="key-result">∂²u/∂t² = v² · ∂²u/∂x²  &nbsp; where v = √(T/ρ)</div>
+      ${makeCard("General solution",
+        "u(x, t) = f(x − vt) + g(x + vt)",
+        "d'Alembert's solution: any function of (x − vt) is a right-traveling wave; any function of (x + vt) is a left-traveling wave. The wave speed v = √(T/ρ) emerges directly from the material properties of the string.",
+      )}
+      ${makeCard("Dimensional check",
+        "[v] = √(N / (kg/m)) = √(kg·m·s⁻² / kg·m⁻¹) = √(m²/s²) = m/s  ✓",
+        "",
+      )}`;
+  }
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+
+let sliderTheta = { 1: 18, 2: 14, 3: 12 };
+
+function renderDiagram(s, theta) {
+  const wrap = document.getElementById("diagWrap");
+  wrap.innerHTML = "";
+  let svg;
+  if (s === 0) svg = drawSetup();
+  else if (s === 1) svg = drawGeometry(theta || sliderTheta[1]);
+  else if (s === 2) svg = drawForces(theta || sliderTheta[2]);
+  else if (s === 3) svg = drawGeometry(sliderTheta[1]);
+  else if (s === 4) svg = drawSmallAngle(theta || sliderTheta[3]);
+  else if (s === 5) svg = drawWaveEq();
+  if (svg) wrap.appendChild(svg);
+}
+
+function attachSliders() {
+  const s1 = document.getElementById("th1");
+  if (s1) {
+    s1.value = sliderTheta[1];
+    document.getElementById("th1v").textContent = sliderTheta[1] + "°";
+    s1.addEventListener("input", () => {
+      sliderTheta[1] = +s1.value;
+      document.getElementById("th1v").textContent = s1.value + "°";
+      renderDiagram(1, +s1.value);
+    });
+  }
+  const s2 = document.getElementById("th2");
+  if (s2) {
+    s2.value = sliderTheta[2];
+    document.getElementById("th2v").textContent = sliderTheta[2] + "°";
+    s2.addEventListener("input", () => {
+      sliderTheta[2] = +s2.value;
+      document.getElementById("th2v").textContent = s2.value + "°";
+      renderDiagram(2, +s2.value);
+    });
+  }
+  const s3 = document.getElementById("th3");
+  if (s3) {
+    s3.value = sliderTheta[3] || 12;
+    document.getElementById("th3v").textContent = (sliderTheta[3] || 12) + "°";
+    s3.addEventListener("input", () => {
+      sliderTheta[3] = +s3.value;
+      document.getElementById("th3v").textContent = s3.value + "°";
+      renderDiagram(4, +s3.value);
+    });
+  }
+}
+
+function render() {
+  // nav
+  const nav = document.getElementById("stageNav");
+  nav.innerHTML = STAGES.map(st =>
+    `<button class="stage-btn${st.id === cur ? " active" : ""}" onclick="goto(${st.id})">${st.id + 1}. ${st.label}</button>`
+  ).join("");
+
+  // diagram
+  renderDiagram(cur);
+
+  // content
+  document.getElementById("content").innerHTML = stageContent(cur);
+  attachSliders();
+}
+
+function goto(n) { cur = n; render(); }
+
+render();
+</script>

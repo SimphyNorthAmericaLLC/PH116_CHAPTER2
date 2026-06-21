@@ -1,0 +1,230 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">Interactive Doppler effect simulation showing wavefront compression and rarefaction as a source moves relative to a stationary observer.</h2>
+
+<div style="background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 1rem;">
+  <canvas id="canvas" width="680" height="360" style="display:block;width:100%;height:auto;background:#0a0a0f;border-radius:var(--border-radius-md);"></canvas>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;">
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 14px;">
+    <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 2px;">Observed (approaching)</div>
+    <div style="font-size: 20px; font-weight: 500; color: #185FA5;" id="f-approach">— Hz</div>
+    <div style="font-size: 12px; color: var(--color-text-secondary);" id="lam-approach">λ = — m</div>
+  </div>
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 14px;">
+    <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 2px;">Observed (receding)</div>
+    <div style="font-size: 20px; font-weight: 500; color: #A32D2D;" id="f-recede">— Hz</div>
+    <div style="font-size: 12px; color: var(--color-text-secondary);" id="lam-recede">λ = — m</div>
+  </div>
+</div>
+
+<div style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <label for="vs" style="min-width: 90px; color: var(--color-text-secondary);">Source speed</label>
+    <input type="range" id="vs" min="0" max="0.95" step="0.01" value="0.5" style="flex: 1;">
+    <span id="vs-val" style="min-width: 60px; text-align: right;">0.50 c_w</span>
+  </div>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <label for="f0" style="min-width: 90px; color: var(--color-text-secondary);">Source freq</label>
+    <input type="range" id="f0" min="200" max="1000" step="10" value="440" style="flex: 1;">
+    <span id="f0-val" style="min-width: 60px; text-align: right;">440 Hz</span>
+  </div>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <label for="cw" style="min-width: 90px; color: var(--color-text-secondary);">Wave speed</label>
+    <input type="range" id="cw" min="100" max="500" step="10" value="343" style="flex: 1;">
+    <span id="cw-val" style="min-width: 60px; text-align: right;">343 m/s</span>
+  </div>
+</div>
+
+<div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+  <button id="playBtn" onclick="togglePlay()">⏸ Pause</button>
+  <button onclick="resetSim()">↺ Reset</button>
+  <button onclick="setPreset(0)">Stationary</button>
+  <button onclick="setPreset(0.5)">Subsonic</button>
+  <button onclick="setPreset(0.95)">Near sonic</button>
+  <button onclick="sendPrompt('Explain the sonic boom and Mach cone when the source moves faster than the wave speed')">Supersonic ↗</button>
+</div>
+
+<div style="margin-top: 12px; font-size: 12px; color: var(--color-text-secondary); line-height: 1.6;">
+  Each ring is a wavefront emitted at a past moment, expanding at the wave speed. Because the source moves between emissions, the rings bunch up ahead (higher frequency) and spread out behind (lower frequency). The blue and red observers measure the frequencies on the panels above.
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = 680, H = 360;
+
+let playing = true;
+let t = 0; // simulation time in seconds
+let lastFrame = performance.now();
+let pulses = []; // {x, y, t_emit}
+let sourceX = W / 2;
+let lastEmit = -Infinity;
+
+function getParams() {
+  return {
+    vs_ratio: parseFloat(document.getElementById('vs').value),
+    f0: parseFloat(document.getElementById('f0').value),
+    cw: parseFloat(document.getElementById('cw').value),
+  };
+}
+
+function resetSim() {
+  t = 0;
+  pulses = [];
+  sourceX = 120;
+  lastEmit = -Infinity;
+}
+
+function setPreset(v) {
+  document.getElementById('vs').value = v;
+  document.getElementById('vs-val').textContent = v.toFixed(2) + ' c_w';
+  resetSim();
+}
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('playBtn').textContent = playing ? '⏸ Pause' : '▶ Play';
+  if (playing) { lastFrame = performance.now(); requestAnimationFrame(loop); }
+}
+
+// Visual scaling: pixels per meter. Pick so a wavelength is visible.
+const PX_PER_M = 1.2;
+
+function step(dt) {
+  const { vs_ratio, f0, cw } = getParams();
+  const vs = vs_ratio * cw; // m/s
+  // advance source (in pixel space, scaled)
+  sourceX += vs * dt * PX_PER_M;
+  if (sourceX > W - 80) {
+    sourceX = 80;
+    pulses = [];
+  }
+  // emit one pulse per period
+  const period = 1 / f0;
+  if (t - lastEmit >= period || lastEmit === -Infinity) {
+    pulses.push({ x: sourceX, y: H / 2, t_emit: t });
+    lastEmit = t;
+  }
+  // age out pulses beyond canvas
+  pulses = pulses.filter(p => (t - p.t_emit) * cw * PX_PER_M < 1.5 * W);
+  t += dt;
+}
+
+function draw() {
+  const { vs_ratio, f0, cw } = getParams();
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  // medium grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+
+  // observer positions
+  const obsRight = { x: W - 40, y: H / 2 };
+  const obsLeft = { x: 40, y: H / 2 };
+
+  // draw wavefronts
+  for (const p of pulses) {
+    const age = t - p.t_emit;
+    const r = age * cw * PX_PER_M;
+    if (r < 1) continue;
+    // color by direction relative to motion: ahead = blue, behind = red
+    // pulse was emitted at p.x; current source is sourceX; if sourceX > p.x source moved right
+    const alpha = Math.max(0, 1 - r / (1.2 * W));
+    ctx.strokeStyle = `rgba(180, 200, 230, ${alpha * 0.9})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // draw source
+  const vs = vs_ratio * cw;
+  ctx.fillStyle = '#F2A623';
+  ctx.beginPath();
+  ctx.arc(sourceX, H / 2, 7, 0, Math.PI * 2);
+  ctx.fill();
+  // velocity arrow
+  if (vs > 0) {
+    ctx.strokeStyle = '#F2A623';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sourceX + 10, H / 2);
+    ctx.lineTo(sourceX + 10 + Math.min(40, vs_ratio * 60), H / 2);
+    ctx.stroke();
+    // arrowhead
+    const ax = sourceX + 10 + Math.min(40, vs_ratio * 60);
+    ctx.beginPath();
+    ctx.moveTo(ax, H / 2);
+    ctx.lineTo(ax - 5, H / 2 - 4);
+    ctx.lineTo(ax - 5, H / 2 + 4);
+    ctx.closePath();
+    ctx.fillStyle = '#F2A623';
+    ctx.fill();
+  }
+
+  // labels
+  ctx.fillStyle = '#F2A623';
+  ctx.font = '500 12px sans-serif';
+  ctx.fillText('source', sourceX - 18, H / 2 - 14);
+
+  // observers
+  ctx.fillStyle = '#378ADD';
+  ctx.beginPath(); ctx.arc(obsRight.x, obsRight.y, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#378ADD';
+  ctx.fillText('observer (ahead)', obsRight.x - 110, obsRight.y + 24);
+
+  ctx.fillStyle = '#E24B4A';
+  ctx.beginPath(); ctx.arc(obsLeft.x, obsLeft.y, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#E24B4A';
+  ctx.fillText('observer (behind)', obsLeft.x + 14, obsLeft.y + 24);
+
+  // Mach indicator when v > c
+  if (vs_ratio >= 1) {
+    ctx.fillStyle = 'rgba(226, 75, 74, 0.9)';
+    ctx.font = '500 13px sans-serif';
+    ctx.fillText('v_s ≥ c_w — shock cone forms', W / 2 - 100, 24);
+  }
+
+  // numeric readouts
+  const fApproach = vs_ratio < 1 ? f0 * cw / (cw - vs) : Infinity;
+  const fRecede = f0 * cw / (cw + vs);
+  const lamApproach = vs_ratio < 1 ? cw / fApproach : 0;
+  const lamRecede = cw / fRecede;
+
+  document.getElementById('f-approach').textContent =
+    vs_ratio < 1 ? Math.round(fApproach) + ' Hz' : '∞ (shock)';
+  document.getElementById('f-recede').textContent = Math.round(fRecede) + ' Hz';
+  document.getElementById('lam-approach').textContent =
+    vs_ratio < 1 ? 'λ = ' + lamApproach.toFixed(2) + ' m' : 'λ → 0';
+  document.getElementById('lam-recede').textContent = 'λ = ' + lamRecede.toFixed(2) + ' m';
+}
+
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
+  lastFrame = now;
+  if (playing) step(dt);
+  draw();
+  if (playing) requestAnimationFrame(loop);
+}
+
+// wire up sliders
+['vs', 'f0', 'cw'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    if (id === 'vs') document.getElementById('vs-val').textContent = v.toFixed(2) + ' c_w';
+    if (id === 'f0') document.getElementById('f0-val').textContent = Math.round(v) + ' Hz';
+    if (id === 'cw') document.getElementById('cw-val').textContent = Math.round(v) + ' m/s';
+  });
+});
+
+resetSim();
+sourceX = 120;
+requestAnimationFrame((t) => { lastFrame = t; loop(t); });
+</script>
