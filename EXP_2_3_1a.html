@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stokes' Theorem — Tiny Circulations</title>
+  <style>
+    :root{color-scheme:dark;--ink:#eef6ff;--muted:#9fb0c3;--panel:#101b2a;--line:#36506d;--cyan:#36d7ff;--gold:#ffd166;--red:#ff6b6b;--green:#62e6a5;--bg:#07111d}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 0,#15314e 0,transparent 38%),var(--bg);color:var(--ink);font:16px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+    main{width:min(1180px,calc(100% - 32px));margin:auto;padding:28px 0 40px}.eyebrow{color:var(--cyan);font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.78rem}h1{font-family:Georgia,serif;font-size:clamp(2rem,5vw,4.2rem);line-height:1;margin:.25rem 0 .7rem;max-width:900px}p{margin:.35rem 0;color:var(--muted)}.lead{font-size:1.1rem;max-width:780px;color:#cbd8e6}
+    .layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.75fr);gap:18px;margin-top:24px}.card{background:color-mix(in srgb,var(--panel) 93%,transparent);border:1px solid #243950;border-radius:18px;box-shadow:0 22px 60px #0007;overflow:hidden}.canvasWrap{position:relative;padding:14px;min-height:570px}canvas{display:block;width:100%;height:540px;border-radius:12px;background:#091522;touch-action:none}.badge{position:absolute;left:28px;top:28px;padding:7px 11px;border-radius:999px;background:#06111dda;border:1px solid #28445f;color:#d9eaff;font-size:.82rem}
+    aside{padding:20px}.step{display:flex;gap:12px;padding:15px 0;border-bottom:1px solid #21364b}.step:last-of-type{border-bottom:0}.num{flex:0 0 30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#183149;color:var(--cyan);font-weight:900}.step.active .num{background:var(--cyan);color:#05111c}.step strong{display:block}.step span{display:block;color:var(--muted);font-size:.92rem;margin-top:3px}
+    .controls{padding-top:15px;display:grid;gap:13px}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:9px}button{border:1px solid #34516e;background:#15283b;color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-weight:750;cursor:pointer}button:hover,button:focus-visible{border-color:var(--cyan);outline:none}button.primary{background:var(--cyan);color:#04111c;border-color:var(--cyan)}input[type=range]{width:100%;accent-color:var(--cyan)}select{background:#0c1b2b;color:var(--ink);border:1px solid #34516e;border-radius:8px;padding:7px}
+    .equation{margin-top:18px;padding:14px 16px;border-left:3px solid var(--gold);background:#0b1725;border-radius:4px 12px 12px 4px;color:#dce9f5;font-family:Georgia,serif;font-size:1.05rem}.legend{display:flex;gap:16px;flex-wrap:wrap;margin:12px 4px 0;color:var(--muted);font-size:.87rem}.key{display:inline-flex;align-items:center;gap:7px}.swatch{width:20px;height:4px;border-radius:4px;background:var(--cyan)}.swatch.red{background:var(--red)}.swatch.gold{background:var(--gold)}
+    @media(max-width:820px){.layout{grid-template-columns:1fr}.canvasWrap{min-height:460px}canvas{height:430px}aside{padding:17px}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Interactive intuition</div>
+  <h1>Stokes' theorem, one tiny loop at a time</h1>
+  <p class="lead">Each tile measures local circulation. Add the tiles: every shared interior edge is counted twice in opposite directions, so only the outside boundary survives.</p>
+  <div class="layout">
+    <section class="card canvasWrap" aria-label="Animated circulation diagram">
+      <canvas id="view"></canvas><div class="badge" id="badge">1 · Local circulation</div>
+      <div class="legend"><span class="key"><i class="swatch"></i>circulation</span><span class="key"><i class="swatch red"></i>shared edges</span><span class="key"><i class="swatch gold"></i>surviving boundary</span></div>
+    </section>
+    <aside class="card">
+      <div class="step active" data-step="0"><div class="num">1</div><div><strong>Tiny loops</strong><span>Each cell has the same counterclockwise orientation—the local curl points out of the screen.</span></div></div>
+      <div class="step" data-step="1"><div class="num">2</div><div><strong>Shared edges cancel</strong><span>Neighbors traverse their common edge in opposite directions. The arrows cancel algebraically.</span></div></div>
+      <div class="step" data-step="2"><div class="num">3</div><div><strong>The boundary remains</strong><span>After interior cancellation, the exposed arrows join into one circulation around the outer curve.</span></div></div>
+      <div class="controls">
+        <div class="buttons"><button id="back">Previous</button><button class="primary" id="next">Next idea</button></div>
+        <div class="row"><label for="grid">Number of tiles</label><select id="grid"><option>2</option><option selected>4</option><option>6</option></select></div>
+        <div><div class="row"><label for="curl">Curl strength</label><output id="curlOut">1.0</output></div><input id="curl" type="range" min="-2" max="2" step="0.1" value="1" /></div>
+        <button id="play">Pause animation</button>
+      </div>
+      <div class="equation">∮<sub>C</sub> F · dℓ = ∬<sub>S</sub> (∇ × F) · n̂ dA</div>
+      <p style="font-size:.86rem;margin-top:12px">The “gears” are not physically meshed. They represent oriented line integrals around neighboring cells.</p>
+    </aside>
+  </div>
+</main>
+<script>
+const canvas=document.querySelector('#view'),ctx=canvas.getContext('2d');
+const badge=document.querySelector('#badge'),gridSel=document.querySelector('#grid'),curlEl=document.querySelector('#curl'),curlOut=document.querySelector('#curlOut');
+let step=0,playing=true,t0=performance.now(); const dpr=()=>Math.min(devicePixelRatio||1,2);
+function resize(){const r=canvas.getBoundingClientRect(),q=dpr();canvas.width=r.width*q;canvas.height=r.height*q;ctx.setTransform(q,0,0,q,0,0)} addEventListener('resize',resize);resize();
+function arrow(x1,y1,x2,y2,color,width=2,alpha=1){ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();const a=Math.atan2(y2-y1,x2-x1),s=7+width;ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-s*Math.cos(a-.48),y2-s*Math.sin(a-.48));ctx.lineTo(x2-s*Math.cos(a+.48),y2-s*Math.sin(a+.48));ctx.closePath();ctx.fill();ctx.restore()}
+function loop(x,y,s,color,phase,alpha=1,width=2){const pad=s*.18,a=(phase%1)*4,pts=[[x+pad,y+s-pad],[x+pad,y+pad],[x+s-pad,y+pad],[x+s-pad,y+s-pad],[x+pad,y+s-pad]];for(let k=0;k<4;k++){let p=pts[k],q=pts[k+1];arrow(p[0],p[1],q[0],q[1],color,width,alpha)}const seg=Math.floor(a),u=a-seg,p=pts[seg],q=pts[seg+1];ctx.save();ctx.fillStyle='#fff';ctx.shadowColor=color;ctx.shadowBlur=12;ctx.beginPath();ctx.arc(p[0]+(q[0]-p[0])*u,p[1]+(q[1]-p[1])*u,4,0,Math.PI*2);ctx.fill();ctx.restore()}
+function draw(now){const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0a1725';ctx.fillRect(0,0,w,h);const n=+gridSel.value,side=Math.min(w*.78,h*.78),cell=side/n,x0=(w-side)/2,y0=(h-side)/2,omega=+curlEl.value,dir=omega>=0?1:-1,phase=((now-t0)/2600*Math.max(.2,Math.abs(omega))*dir+10)%1;
+ ctx.strokeStyle='#29425a';ctx.lineWidth=1;for(let i=0;i<=n;i++){ctx.beginPath();ctx.moveTo(x0+i*cell,y0);ctx.lineTo(x0+i*cell,y0+side);ctx.stroke();ctx.beginPath();ctx.moveTo(x0,y0+i*cell);ctx.lineTo(x0+side,y0+i*cell);ctx.stroke()}
+ if(step===0){for(let j=0;j<n;j++)for(let i=0;i<n;i++)loop(x0+i*cell,y0+j*cell,cell,'#36d7ff',dir>0?phase:1-phase,.9,Math.min(3,1.4+Math.abs(omega)*.5));}
+ if(step===1){for(let j=0;j<n;j++)for(let i=0;i<n;i++)loop(x0+i*cell,y0+j*cell,cell,'#36d7ff',dir>0?phase:1-phase,.20,1.5);ctx.strokeStyle='#ff6b6b';ctx.lineWidth=5;ctx.setLineDash([10,8]);for(let i=1;i<n;i++){ctx.beginPath();ctx.moveTo(x0+i*cell,y0);ctx.lineTo(x0+i*cell,y0+side);ctx.stroke();ctx.beginPath();ctx.moveTo(x0,y0+i*cell);ctx.lineTo(x0+side,y0+i*cell);ctx.stroke()}ctx.setLineDash([]);ctx.fillStyle='#ffd9d9';ctx.font='700 15px system-ui';ctx.textAlign='center';ctx.fillText('same edge + opposite directions = 0',w/2,Math.max(25,y0-18));}
+ if(step===2){ctx.globalAlpha=.16;for(let j=0;j<n;j++)for(let i=0;i<n;i++)loop(x0+i*cell,y0+j*cell,cell,'#36d7ff',dir>0?phase:1-phase,.22,1);ctx.globalAlpha=1;const p=side*.025;ctx.strokeStyle='#ffd166';ctx.lineWidth=6;ctx.strokeRect(x0-p,y0-p,side+2*p,side+2*p);const pts=[[x0-p,y0+side+p],[x0-p,y0-p],[x0+side+p,y0-p],[x0+side+p,y0+side+p],[x0-p,y0+side+p]],a=((dir>0?phase:1-phase)%1)*4,k=Math.floor(a),u=a-k,A=pts[k],B=pts[k+1];arrow(A[0],A[1],B[0],B[1],'#ffd166',5,1);ctx.fillStyle='#fff';ctx.font='800 16px system-ui';ctx.textAlign='center';ctx.fillText('Only the outer boundary survives',w/2,Math.max(25,y0-22));}
+ if(playing)requestAnimationFrame(draw)}
+function setStep(v){step=(v+3)%3;document.querySelectorAll('.step').forEach((e,i)=>e.classList.toggle('active',i===step));badge.textContent=["1 · Local circulation","2 · Interior cancellation","3 · Boundary circulation"][step];if(!playing)draw(performance.now())}
+document.querySelector('#next').onclick=()=>setStep(step+1);document.querySelector('#back').onclick=()=>setStep(step-1);document.querySelectorAll('.step').forEach(e=>e.onclick=()=>setStep(+e.dataset.step));
+gridSel.onchange=()=>draw(performance.now());curlEl.oninput=()=>{curlOut.value=(+curlEl.value).toFixed(1);draw(performance.now())};document.querySelector('#play').onclick=e=>{playing=!playing;e.currentTarget.textContent=playing?'Pause animation':'Resume animation';if(playing)requestAnimationFrame(draw)};requestAnimationFrame(draw);
+</script>
+</body></html>
