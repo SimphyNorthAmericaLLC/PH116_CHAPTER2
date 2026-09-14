@@ -1,0 +1,372 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+
+<style>
+:root{
+  --c-bg: var(--color-background-primary, #0e0f12);
+  --c-bg2: var(--color-background-secondary, #17181c);
+  --c-text: var(--color-text-primary, #e8e9ec);
+  --c-text2: var(--color-text-secondary, #9a9ca3);
+  --c-bd: var(--color-border-tertiary, #2a2c32);
+  --c-bd2: var(--color-border-secondary, #33353c);
+  --r-lg: var(--border-radius-lg, 12px);
+  --r-md: var(--border-radius-md, 8px);
+  --f-sans: var(--font-sans, -apple-system, Segoe UI, Roboto, sans-serif);
+  --f-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.root{font-family:var(--f-sans);color:var(--c-text);background:var(--c-bg);padding:.85rem;border-radius:var(--r-lg)}
+.op-tabs,.field-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.op-tabs{margin-bottom:.55rem}
+.field-tabs{margin-bottom:1rem}
+.op-tab,.field-tab{font-size:12px;padding:5px 14px;border-radius:20px;border:0.5px solid var(--c-bd2);background:transparent;color:var(--c-text2);cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit}
+.op-tab:hover:not(.on),.field-tab:hover:not(.on){background:var(--c-bg2)}
+.op-tab[data-op="grad"].on{background:#123049;color:#8fc4f5;border-color:#2f6ea3}
+.op-tab[data-op="lap"].on {background:#0e3a30;color:#7fe0c0;border-color:#2c8a6a}
+.op-tab[data-op="div"].on {background:#463414;color:#f3c96a;border-color:#a3771f}
+.op-tab[data-op="curl"].on{background:#48222f;color:#f3a1c0;border-color:#a3466f}
+.op-tab.on,.field-tab.on{font-weight:600}
+.field-tab.on{background:var(--c-bg2);color:var(--c-text);border-color:var(--c-bd2)}
+.field-tab .k{opacity:.55;font-size:10.5px;margin-left:5px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:.75rem;align-items:start}
+canvas{display:block;width:100%;border-radius:var(--r-md);border:0.5px solid var(--c-bd);cursor:crosshair;background:#000}
+.card{background:var(--c-bg2);border:0.5px solid var(--c-bd);border-radius:var(--r-lg);padding:.85rem 1rem;margin-bottom:.6rem}
+.card h3{font-size:11px;font-weight:600;color:var(--c-text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
+.field-line{font-size:12.5px;color:var(--c-text2);margin-bottom:.4rem}
+.formula{font-size:13px;line-height:1.9;color:var(--c-text)}
+.meaning{font-size:12px;line-height:1.6;color:var(--c-text2);margin-top:.45rem}
+.obs{font-size:12px;line-height:1.6;color:var(--c-text);margin-top:.3rem}
+.bug{font-size:11px;line-height:1.55;color:#f3c96a;margin-top:.5rem;padding-top:.5rem;border-top:0.5px dashed var(--c-bd2)}
+.pt-label{font-size:11px;color:var(--c-text2);margin-bottom:.3rem;font-family:var(--f-mono)}
+.pt-val{font-family:var(--f-mono);font-size:12.5px;line-height:1.85;color:var(--c-text)}
+.leg-row{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--c-text2);margin-bottom:4px}
+.leg-sw{width:30px;height:5px;border-radius:2px;flex-shrink:0}
+hr{border:none;border-top:0.5px solid var(--c-bd);margin:.5rem 0}
+</style>
+
+<h2 class="sr-only">Vector calculus operator explorer with exact analytic gradient, Laplacian, divergence and curl for paired canonical fields</h2>
+
+<div class="root">
+  <div class="op-tabs">
+    <button class="op-tab on"  data-op="grad">&nabla;f&nbsp; gradient</button>
+    <button class="op-tab"     data-op="lap" >&nabla;&sup2;f&nbsp; Laplacian</button>
+    <button class="op-tab"     data-op="div" >&nabla;&middot;F&nbsp; divergence</button>
+    <button class="op-tab"     data-op="curl">&nabla;&times;F&nbsp; curl</button>
+  </div>
+  <div class="field-tabs" id="fieldTabs"></div>
+
+  <div class="layout">
+    <div><canvas id="cv" role="img" aria-label="Colormap of the selected vector calculus operator"></canvas></div>
+    <div>
+      <div class="card" id="opCard"></div>
+      <div class="card">
+        <h3>at cursor</h3>
+        <div class="pt-label" id="ptLabel">hover canvas</div>
+        <div class="pt-val"   id="ptVal"> </div>
+      </div>
+      <div class="card">
+        <h3>color key</h3>
+        <div id="legWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DOM=2.8, BGRID=90, NVEC=22;
+let curOp="grad", curField=0, mX=null, mY=null;
+
+// ---------------------------------------------------------------------
+// Every quantity below is an EXACT closed-form derivative, not a
+// finite-difference approximation — no truncation error, and no risk of
+// the derivative formula silently drifting from the field it's supposed
+// to describe.
+// ---------------------------------------------------------------------
+
+const SCALAR_FIELDS = [
+  { id:"gauss", label:"Gaussian bump", katexField:"f(x,y)=e^{-x^2-y^2}",
+    f:(x,y)=>Math.exp(-(x*x+y*y)),
+    grad:(x,y)=>{const g=Math.exp(-(x*x+y*y)); return [-2*x*g,-2*y*g];},
+    gradKatex:"\\nabla f=\\big(-2x\\,e^{-x^2-y^2},\\,-2y\\,e^{-x^2-y^2}\\big)",
+    lap:(x,y)=>{const g=Math.exp(-(x*x+y*y)); return (4*x*x+4*y*y-4)*g;},
+    lapKatex:"\\nabla^2 f=\\big(4x^2+4y^2-4\\big)e^{-x^2-y^2}",
+    gradObs:"Arrows point radially away from the peak, magnitude falling off with the same Gaussian envelope as f itself. They vanish exactly at the origin — the one critical point.",
+    lapObs:"Deep blue (concave down) fills the peak. The Laplacian crosses zero on the circle x²+y²=1 — the inflection ring of the bump — then turns positive (concave up) outside it.",
+  },
+  { id:"saddle", label:"Saddle x²−y²", katexField:"f(x,y)=x^2-y^2",
+    f:(x,y)=>x*x-y*y,
+    grad:(x,y)=>[2*x,-2*y],
+    gradKatex:"\\nabla f=(2x,\\,-2y)",
+    lap:(x,y)=>0,
+    lapKatex:"\\nabla^2 f=2-2=0 \\quad\\text{(harmonic everywhere)}",
+    gradObs:"Arrows point outward along x, inward along y — the signature saddle shape. Still zero only at the origin, even though the origin is a saddle, not an extremum.",
+    lapObs:"Identically zero everywhere: this f satisfies Laplace's equation. The colormap should be flat — a good sanity check that the curvature in x and the curvature in y are equal and opposite at every point, not just on average.",
+  },
+];
+
+const VECTOR_FIELDS = [
+  { id:"gauss", label:"Radial × Gaussian", katexField:"F=(x,y)\\,e^{-x^2-y^2}",
+    F:(x,y)=>{const g=Math.exp(-(x*x+y*y)); return [x*g,y*g];},
+    div:(x,y)=>{const g=Math.exp(-(x*x+y*y)); return 2*(1-x*x-y*y)*g;},
+    divKatex:"\\nabla\\!\\cdot\\!F=2\\big(1-x^2-y^2\\big)e^{-x^2-y^2}",
+    curl:(x,y)=>{const g=Math.exp(-(x*x+y*y)); return 0;},
+    divObs:"Strong red source at the origin. A blue annular sink ring appears at radius 1 (where 1−x²−y² changes sign) — field lines spread out from the center then bend back in. Net flux through any large circle → 0 as the field decays.",
+  },
+  { id:"uniform", label:"Radial (linear)", katexField:"F=(x,y)",
+    F:(x,y)=>[x,y],
+    div:(x,y)=>2,
+    divKatex:"\\nabla\\!\\cdot\\!F=2 \\quad\\text{(constant)}",
+    curl:(x,y)=>0,
+    divObs:"Constant positive divergence everywhere — this is uniform expansion, with no annular sink like the Gaussian version. Useful contrast: divergence measures a *local* outflow rate, and here that rate doesn't depend on position at all.",
+  },
+];
+
+const VECTOR_FIELDS_CURL = [
+  { id:"gauss", label:"Rotation × Gaussian", katexField:"F=(-y,x)\\,e^{-x^2-y^2}",
+    F:(x,y)=>{const g=Math.exp(-(x*x+y*y)); return [-y*g,x*g];},
+    curl:(x,y)=>{const g=Math.exp(-(x*x+y*y)); return 2*(1-x*x-y*y)*g;},
+    curlKatex:"(\\nabla\\times F)_z=2\\big(1-x^2-y^2\\big)e^{-x^2-y^2}",
+    div:(x,y)=>0,
+    curlObs:"Strong CCW spin (red) fills the core. Past radius 1 the curl turns negative (blue ring): the field is still rotating counterclockwise there, but its swirl strength is falling off faster than pure rotation would — net local vorticity flips sign.",
+  },
+  { id:"uniform", label:"Rotation (linear)", katexField:"F=(-y,x)",
+    F:(x,y)=>[-y,x],
+    curl:(x,y)=>2,
+    curlKatex:"(\\nabla\\times F)_z=2 \\quad\\text{(constant)}",
+    div:(x,y)=>0,
+    curlObs:"Pure rigid-body rotation: constant curl = 2 everywhere, zero divergence everywhere. This is the field every intro treatment of curl has in mind — contrast with the Gaussian version, where the sign of the curl itself depends on position.",
+  },
+];
+
+function currentSet(){
+  if(curOp==="grad"||curOp==="lap") return SCALAR_FIELDS;
+  if(curOp==="div") return VECTOR_FIELDS;
+  return VECTOR_FIELDS_CURL;
+}
+
+function kt(str){ try{ return katex.renderToString(str,{throwOnError:false}); }catch(e){ return str; } }
+
+function scalarAt(field,x,y){
+  if(curOp==="grad") return field.f(x,y);
+  if(curOp==="lap")  return field.f(x,y);
+  if(curOp==="div")  return field.div(x,y);
+  return field.curl(x,y);
+}
+
+function cmSeq(t,dark){
+  t=Math.max(0,Math.min(1,t));
+  return `rgb(${Math.round(15+t*55)},${Math.round(35+t*165)},${Math.round(70+t*175)})`;
+}
+function cmDvg(t){
+  t=Math.max(-1,Math.min(1,t));
+  if(t>=0) return `rgb(${Math.round(20+t*30)},${Math.round(60+t*160)},${Math.round(80+t*140)})`;
+  const s=-t; return `rgb(${Math.round(160+s*90)},${Math.round(40-s*30)},${Math.round(40-s*20)})`;
+}
+
+function drawArrow(ctx,sx,sy,nx,ny,len,col){
+  if(len<1.5) return;
+  const ex=sx+nx*len, ey=sy-ny*len;
+  ctx.strokeStyle=col; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+  const ah=Math.min(len*0.38,6.5);
+  const ang=Math.atan2(ey-sy,ex-sx);
+  ctx.fillStyle=col;
+  ctx.beginPath();
+  ctx.moveTo(ex,ey);
+  ctx.lineTo(ex-ah*Math.cos(ang-0.42),ey-ah*Math.sin(ang-0.42));
+  ctx.lineTo(ex-ah*Math.cos(ang+0.42),ey-ah*Math.sin(ang+0.42));
+  ctx.closePath(); ctx.fill();
+}
+
+function draw(){
+  const cv=document.getElementById("cv");
+  const W=cv.parentElement.offsetWidth;
+  const H=Math.round(W*0.74);
+  const dpr=devicePixelRatio||1;
+  cv.width=W*dpr; cv.height=H*dpr;
+  cv.style.width=W+"px"; cv.style.height=H+"px";
+  const ctx=cv.getContext("2d");
+  ctx.scale(dpr,dpr);
+
+  const field=currentSet()[curField];
+  const toSX=x=>(x+DOM)/(2*DOM)*W;
+  const toSY=y=>H-(y+DOM)/(2*DOM)*H;
+  const toWX=sx=>sx/W*(2*DOM)-DOM;
+  const toWY=sy=>(1-sy/H)*(2*DOM)-DOM;
+  const cw=W/BGRID, ch=H/BGRID;
+
+  const svals=[];
+  for(let i=0;i<BGRID;i++) for(let j=0;j<BGRID;j++){
+    const x=-DOM+(i+0.5)/BGRID*(2*DOM);
+    const y=-DOM+(j+0.5)/BGRID*(2*DOM);
+    svals.push(scalarAt(field,x,y));
+  }
+  const mn=Math.min(...svals), mx=Math.max(...svals);
+  const maxAbs=Math.max(1e-9,...svals.map(v=>Math.abs(v)));
+  const rng=Math.max(1e-9,mx-mn);
+
+  let k=0;
+  for(let i=0;i<BGRID;i++) for(let j=0;j<BGRID;j++){
+    const v=svals[k++];
+    ctx.fillStyle = curOp==="grad"
+      ? cmSeq((v-mn)/rng)
+      : cmDvg(v/maxAbs);
+    ctx.fillRect(
+      Math.floor(toSX(-DOM+i/BGRID*(2*DOM))),
+      Math.floor(toSY(-DOM+(j+1)/BGRID*(2*DOM))),
+      Math.ceil(cw)+1, Math.ceil(ch)+1);
+  }
+
+  const Fvec = curOp==="grad" ? field.grad
+             : curOp==="div"  ? field.F
+             : curOp==="curl" ? field.F
+             : null;
+
+  if(Fvec){
+    const vdata=[], mags=[];
+    for(let i=0;i<NVEC;i++) for(let j=0;j<NVEC;j++){
+      const x=-DOM+(i+0.5)/NVEC*(2*DOM);
+      const y=-DOM+(j+0.5)/NVEC*(2*DOM);
+      const [fx,fy]=Fvec(x,y);
+      const mag=Math.sqrt(fx*fx+fy*fy);
+      mags.push(mag); vdata.push({x,y,fx,fy,mag});
+    }
+    const maxMag=Math.max(1e-9,...mags);
+    const aScale=W/NVEC*0.42;
+    const isGrad=curOp==="grad";
+    const ac = isGrad ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.5)";
+    for(const {x,y,fx,fy,mag} of vdata){
+      if(mag<1e-10) continue;
+      const len = isGrad ? (mag/maxMag)*aScale : Math.min(mag/maxMag,0.85)*aScale;
+      drawArrow(ctx,toSX(x),toSY(y),fx/mag,fy/mag,len,ac);
+    }
+  }
+
+  ctx.strokeStyle="rgba(255,255,255,0.14)";
+  ctx.lineWidth=0.8;
+  ctx.beginPath(); ctx.moveTo(toSX(0),0); ctx.lineTo(toSX(0),H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,toSY(0)); ctx.lineTo(W,toSY(0)); ctx.stroke();
+  ctx.fillStyle="rgba(255,255,255,0.38)";
+  ctx.font="11px monospace"; ctx.textAlign="center";
+  ctx.fillText("x",W-9,toSY(0)-5);
+  ctx.fillText("y",toSX(0)+10,11);
+
+  if(mX!==null){
+    ctx.strokeStyle="rgba(255,255,255,0.28)";
+    ctx.lineWidth=0.8; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(mX,0); ctx.lineTo(mX,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,mY); ctx.lineTo(W,mY); ctx.stroke();
+    ctx.setLineDash([]);
+    updatePoint(toWX(mX),toWY(mY),field);
+  }
+
+  updateLegend(mn,mx,maxAbs);
+}
+
+function updatePoint(wx,wy,field){
+  document.getElementById("ptLabel").textContent=`(x, y) = (${wx.toFixed(2)}, ${wy.toFixed(2)})`;
+  let html="";
+  if(curOp==="grad"){
+    const fv=field.f(wx,wy);
+    const [gx,gy]=field.grad(wx,wy);
+    html=`f&nbsp;=&nbsp;${fv.toFixed(4)}<br>&part;f/&part;x&nbsp;=&nbsp;${gx.toFixed(4)}<br>&part;f/&part;y&nbsp;=&nbsp;${gy.toFixed(4)}<br>|&nabla;f|&nbsp;=&nbsp;${Math.sqrt(gx*gx+gy*gy).toFixed(4)}`;
+  } else if(curOp==="lap"){
+    html=`f&nbsp;=&nbsp;${field.f(wx,wy).toFixed(4)}<br>&nabla;&sup2;f&nbsp;=&nbsp;${field.lap(wx,wy).toFixed(4)}`;
+  } else if(curOp==="div"){
+    const [fx,fy]=field.F(wx,wy);
+    html=`F&nbsp;=&nbsp;(${fx.toFixed(4)}, ${fy.toFixed(4)})<br>&nabla;&middot;F&nbsp;=&nbsp;${field.div(wx,wy).toFixed(4)}`;
+  } else {
+    const [fx,fy]=field.F(wx,wy);
+    html=`F&nbsp;=&nbsp;(${fx.toFixed(4)}, ${fy.toFixed(4)})<br>(&nabla;&times;F)_z&nbsp;=&nbsp;${field.curl(wx,wy).toFixed(4)}`;
+  }
+  document.getElementById("ptVal").innerHTML=html;
+}
+
+function updateLegend(mn,mx,maxAbs){
+  const w=document.getElementById("legWrap");
+  if(curOp==="grad"){
+    w.innerHTML=`
+      <div class="leg-row"><span class="leg-sw" style="background:${cmSeq(1)}"></span><span>f = ${mx.toFixed(3)} (peak)</span></div>
+      <div class="leg-row"><span class="leg-sw" style="background:${cmSeq(0.5)}"></span><span>f = ${((mn+mx)/2).toFixed(3)}</span></div>
+      <div class="leg-row"><span class="leg-sw" style="background:${cmSeq(0)}"></span><span>f = ${mn.toFixed(3)} (low)</span></div>
+      <hr><div style="font-size:11px;color:var(--c-text2)">arrows = &nabla;f direction + |&nabla;f|</div>`;
+  } else {
+    const hi=maxAbs.toFixed(4);
+    w.innerHTML=`
+      <div class="leg-row"><span class="leg-sw" style="background:${cmDvg(1)}"></span><span>+${hi}</span></div>
+      <div class="leg-row"><span class="leg-sw" style="background:${cmDvg(0)}"></span><span>0</span></div>
+      <div class="leg-row"><span class="leg-sw" style="background:${cmDvg(-1)}"></span><span>&minus;${hi}</span></div>
+      ${curOp!=="lap"?'<hr><div style="font-size:11px;color:var(--c-text2)">faint arrows = F(x,y) itself</div>':''}`;
+  }
+}
+
+function updateFieldTabs(){
+  const set=currentSet();
+  const wrap=document.getElementById("fieldTabs");
+  wrap.innerHTML="";
+  set.forEach((fld,i)=>{
+    const b=document.createElement("button");
+    b.className="field-tab"+(i===curField?" on":"");
+    b.innerHTML=`${fld.label} <span class="k">${fld.katexField.replace(/\\|[{}]/g,"")}</span>`;
+    b.addEventListener("click",()=>{ curField=i; updateFieldTabs(); updateOpCard(); draw(); });
+    wrap.appendChild(b);
+  });
+}
+
+function updateOpCard(){
+  const field=currentSet()[curField];
+  const labels={grad:"&nabla;f — gradient",lap:"&nabla;&sup2;f — Laplacian",div:"&nabla;&middot;F — divergence",curl:"&nabla;&times;F — curl (z-component)"};
+  let fieldK, opK, obs, meaning, bug="";
+  if(curOp==="grad"){
+    fieldK=field.katexField; opK=field.gradKatex; obs=field.gradObs;
+    meaning="Background = f. Arrows = &nabla;f: direction of steepest ascent, arrow length &prop; |&nabla;f|.";
+  } else if(curOp==="lap"){
+    fieldK=field.katexField; opK=field.lapKatex; obs=field.lapObs;
+    meaning="Scalar colormap only (no arrows — &nabla;&sup2;f is a scalar). Blue = concave down. Red = concave up.";
+  } else if(curOp==="div"){
+    fieldK=field.katexField; opK=field.divKatex; obs=field.divObs;
+    meaning="Scalar colormap of &nabla;&middot;F. Red = local source (outflow). Blue = local sink (inflow). Faint arrows show F itself.";
+    if(field.id==="gauss") bug="Note: an earlier version of this widget stated this divergence as (2&minus;4x&sup2;&minus;4y&sup2;)e^(&minus;r&sup2;) — that was wrong. Differentiating F = (x,y)e^(&minus;r&sup2;) term-by-term gives (2&minus;2x&sup2;&minus;2y&sup2;)e^(&minus;r&sup2;), i.e. the same expression as the curl case below (by symmetry, since these two fields are 90&deg; rotations of each other).";
+  } else {
+    fieldK=field.katexField; opK=field.curlKatex; obs=field.curlObs;
+    meaning="Scalar colormap of the z-component of &nabla;&times;F. Red = counterclockwise (CCW) rotation. Blue = clockwise (CW). Faint arrows show F itself.";
+  }
+  document.getElementById("opCard").innerHTML=`
+    <h3>${labels[curOp]}</h3>
+    <div class="field-line">${kt(fieldK)}</div>
+    <div class="formula">${kt(opK)}</div>
+    <hr>
+    <div class="meaning">${meaning}</div>
+    <hr>
+    <div class="obs"><strong>What to see:</strong> ${obs}</div>
+    ${bug?`<div class="bug">${bug}</div>`:""}`;
+}
+
+document.querySelectorAll(".op-tab").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    curOp=btn.dataset.op;
+    curField=0;
+    document.querySelectorAll(".op-tab").forEach(b=>b.classList.remove("on"));
+    btn.classList.add("on");
+    updateFieldTabs(); updateOpCard(); draw();
+  });
+});
+
+const cv=document.getElementById("cv");
+cv.addEventListener("mousemove",e=>{
+  const r=cv.getBoundingClientRect();
+  mX=(e.clientX-r.left)*(cv.offsetWidth/r.width);
+  mY=(e.clientY-r.top)*(cv.offsetHeight/r.height);
+  draw();
+});
+cv.addEventListener("mouseleave",()=>{
+  mX=null; mY=null;
+  document.getElementById("ptLabel").textContent="hover canvas";
+  document.getElementById("ptVal").textContent=" ";
+  draw();
+});
+
+updateFieldTabs(); updateOpCard(); draw();
+window.addEventListener("resize",draw);
+</script>
